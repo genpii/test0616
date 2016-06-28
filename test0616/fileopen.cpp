@@ -206,6 +206,7 @@ void a10::loadRF0(int frame)
 	short tmp;
 	cout << "loading RF(frame: " << frame << ")...\n";
 	for (int i = 0; i < line; ++i){
+		//cout << "Loading line:" << i << "\n";
 		for (int j = 0; j < ch - 16; ++j){ // back of 80 elements
 			fin.seekg(8, ios_base::cur); //attribute 6byte channel number 2byte
 			for (int k = 0; k < sample - 1; ++k){
@@ -269,9 +270,9 @@ int a10::plotRF0(string dir)
 	int ch = RF0[0].size();
 	int sample = RF0[0][0].size();
 
-	for (int i = 60; i < 61; ++i){
+	for (int i = 0; i < line; ++i){
 		/*ost << "./" << dir << "/" << i << ".dat";*/
-		ost << "./" << dir << ".dat";
+		ost << "./" << dir << i << ".dat";
 		fout.open(ost.str(), ios_base::out);
 		ost.clear();
 		ost.str("");

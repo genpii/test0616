@@ -18,101 +18,38 @@
 #include "header.h"
 
 using namespace std;
-using namespace Eigen;
-
-
-struct misra1a_functor
-{
-	misra1a_functor(int inputs, int values, double *x, double *y)
-		: inputs_(inputs), values_(values), x(x), y(y) {}
-
-	double *x;
-	double *y;
-
-	double p = 0.2e3;
-	double l = 9.5e3;
-	double sn = 0.15646446504;
-
-	// 目的関数
-	int operator()(const VectorXd& b, VectorXd& fvec) const
-	{
-		for (int i = 0; i < values_; ++i) {
-			fvec[i] = (b[0] + sqrt(pow(p * x[i], 2) + 2.0 * (b[0] * sn - l)*p*x[i] + pow(b[0], 2) + pow(l, 2) - 2.0 * b[0] * l*sn)) / b[1] - y[i];
-		}
-		return 0;
-	}
-	// 微分,ヤコビアン
-	int df(const VectorXd& b, MatrixXd& fjac)
-	{
-		for (int i = 0; i < values_; ++i) {
-			fjac(i, 0) = 1 / b[1] + (b[0] + sn*(p*x[i] - l)) / sqrt(pow(p * x[i], 2) + 2.0 * (b[0] * sn - l)*p*x[i] + pow(b[0], 2) + pow(l, 2) - 2.0 * b[0] * l*sn);
-			fjac(i, 1) = -(b[0] + sqrt(pow(p * x[i], 2) + 2.0 * (b[0] * sn - l)*p*x[i] + pow(b[0], 2) + pow(l, 2) - 2.0 * b[0] * l*sn)) / b[1] / b[1];
-		}
-		return 0;
-	}
-
-	const int inputs_;
-	const int values_;
-	int inputs() const { return inputs_; }
-	int values() const { return values_; }
-};
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	//cin.tie(0);
-	//ios::sync_with_stdio(false);
-	//ifstream plot("elemplus.dat", ios_base::in);
 
-	//double xa[75], ya[75];
-	//for (int i = 0; i < 75; ++i){
-	//	plot >> xa[i] >> ya[i];
-	//}
-
-	//const int n = 2; // beta1とbeta2で二つ
-	//int info;
-
-	//VectorXd p(n); // beta1とbeta2の初期値(適当)
-	//p << 45.0e3, 1550.0;
-
-	//// 入力データ
-	////double xa[] = { 77.6E0, 114.9E0, 141.1E0, 190.8E0, 239.9E0, 289.0E0, 332.8E0, 378.4E0, 434.8E0, 477.3E0, 536.8E0, 593.1E0, 689.1E0, 760.0E0 };
-	////double ya[] = { 10.07E0, 14.73E0, 17.94E0, 23.93E0, 29.61E0, 35.18E0, 40.02E0, 44.82E0, 50.76E0, 55.05E0, 61.01E0, 66.40E0, 75.47E0, 81.78E0 };
-
-	//std::vector<double> x(&xa[0], &xa[75]); // vectorの初期化は不便
-	//std::vector<double> y(&ya[0], &ya[75]);
-
-	//misra1a_functor functor(n, x.size(), &x[0], &y[0]);
-	//LevenbergMarquardt<misra1a_functor> lm(functor);
-	//info = lm.minimize(p);
-
-	//std::cout << p[0] << " " << p[1] << std::endl;
-
-	vector<int> b_ele;
-	//b_ele = { 8, 9, 10, 11, 12, 13, 14, 19, 42, 47, 56, 79, 80 };
 	//string RFdir = "D:/RFdata/study/20160622/";
 	//string dirname = "D:/RFdata/study/20151026/";
 	//physio phy(dirname + "2");
 
+
+#ifdef _DEBUG
+	cout << "debugging now!\n";
+#endif
+
 	/* open data */
 	cout << "Load started.\n";
-	//string filename = "D:/RFdata/study/20151120/sector/RF20151120150735.crf";
-	//string filename = "D:/RFdata/study/20151026/sample1026.crf"; //phantom
-	//string filename = "D:/RFdata/study/20151222/1/1.crf";
-	//string filename = "D:/RFdata/study/20160104/2/RF.crf"; //present target
 
-	//string dirstr = "52101_1";
-
-	//string RFname = "52101_2";
-	string RFdir = "D:/RFdata/study/20160622/52101_1.crf";
+	string RFdir = "D:/RFdata/study/20160617/2.crf";
 	a10 raw(RFdir);
-	//raw.loadheader();
-	raw.frq_s = 30.0;
+
+	vector<int> b_ele; //故障した素子 <-後でクラスa10の方に組み込む予定
+	if (raw.probe_name = "52101") //52101だと端が使える
+		b_ele = { 8, 9, 10, 11, 12, 13, 14, 25, 41, 42, 47, 56, 79, 80, 88 };
+	else if (raw.probe_name = "52105") //52105だと使えない
+		b_ele = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 25, 41, 42, 47, 56, 79, 80, 88, 89, 90, 91, 92, 93, 94, 95 };
+	else
+		b_ele = {};
+	int N_b_ele = b_ele.size();
+	int finest_ele = 48; //基準素子
+
+	raw.frq_s = 30.0; //30MHzにしておく
 	raw.printheader();
 
-
-
-	//cin >> RFdir;
-	//raw.frame = 3;
 	unsigned short frame = raw.frame;
 	unsigned short line = raw.line;
 	unsigned short sample = raw.sample;
@@ -122,12 +59,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	float frq_r = raw.frq_r;
 	float frq_s = raw.frq_s;
 	float FR = raw.FR;
-
-
-
-
-
-
 
 	int physio_offset = 1000 / FR;
 	//phy.extract(physio_offset);
@@ -140,19 +71,331 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	//raw.loadRF();
 
-	//ifstream ffin("elem.dat", ios_base::in);
-	//vector<double> xx(81, 0);
-	//vector<double> yy(81, 0);
-	//for (int i = 0; i < 81; ++i){
-	//	ffin >> xx[i] >> yy[i];
-	//	//yy[i] *= 1e-6;
+	raw.loadRF0(0);
+
+	//raw.plotRF0("0627phantom");
+
+
+	cout << "creating analytic signal...\n";
+
+	vector<vector<vector<float>>> elere(line, vector<vector<float>>(ch, vector<float>(4 * sample, 0)));
+	vector<vector<vector<float>>> eleim(line, vector<vector<float>>(ch, vector<float>(4 * sample, 0)));
+
+	//spec and buffer setting for FFT
+	Ipp8u *specbuff, *initbuff, *workbuff;
+	Ipp8u *specbufi, *initbufi, *workbufi;
+	int size_specf, size_initf, size_workf;
+	int size_speci, size_initi, size_worki;
+	IppsFFTSpec_C_32fc *specf = 0;
+	IppsFFTSpec_C_32fc *speci = 0;
+	Ipp32fc *ipsrc = ippsMalloc_32fc((int)sample);
+	Ipp32fc *ipdst = ippsMalloc_32fc((int)sample);
+	Ipp32fc *ipsrc2 = ippsMalloc_32fc((int)(4 * sample));
+	Ipp32fc *ipdst2 = ippsMalloc_32fc((int)(4 * sample));
+	const int fftorder = (int)(log((double)sample) / log(2.0));
+	const int ifftorder = (int)(log((double)(4 * sample)) / log(2.0));
+	ippsFFTGetSize_C_32fc(fftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, &size_specf, &size_initf, &size_workf);
+	ippsFFTGetSize_C_32fc(ifftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, &size_speci, &size_initi, &size_worki);
+	specbuff = ippsMalloc_8u(size_specf);
+	specbufi = ippsMalloc_8u(size_speci);
+	initbuff = ippsMalloc_8u(size_initf);
+	initbufi = ippsMalloc_8u(size_initi);
+	workbuff = ippsMalloc_8u(size_workf);
+	workbufi = ippsMalloc_8u(size_worki);
+	ippsFFTInit_C_32fc(&specf, fftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, specbuff, initbuff);
+	ippsFFTInit_C_32fc(&speci, ifftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, specbufi, initbufi);
+
+	for (int j = 0; j < line; ++j){
+		cout << "line:" << j << "\n";
+		for (int k = 0; k < ch; ++k){
+			ippsZero_32fc(ipsrc, sample);
+			ippsZero_32fc(ipdst, sample);
+			ippsZero_32fc(ipsrc2, 4 * sample);
+			ippsZero_32fc(ipdst2, 4 * sample);
+			//set
+			for (int l = 0; l < sample - 1; ++l)
+				ipsrc[l].re = raw.RF0[j][k][l];
+			//ipsrc[l].re = raw.RF[60][j][k][l] - raw.RF[59][j][k][l];
+
+			//do FFT
+			ippsFFTFwd_CToC_32fc(ipsrc, ipdst, specf, workbuff);
+			ippsZero_8u(workbuff, size_workf);
+			//double positive part and delete negative part
+			for (int l = 0; l < sample / 2; ++l){
+				ipdst[l].re = ipdst[l].re * 2 / sample;
+				ipdst[l].im = ipdst[l].im * 2 / sample;
+				ipdst[l + sample / 2].re = 0.0;
+				ipdst[l + sample / 2].im = 0.0;
+			}
+			for (int l = 0; l < 34; ++l){
+				ipdst[l].re = 0.0;
+				ipdst[l].im = 0.0;
+			}
+
+
+			//ipdst[0].re /= 2;
+			//ipdst[0].im /= 2;
+
+			for (int l = 0; l < sample; ++l){
+				ipsrc2[l].re = ipdst[l].re;
+				ipsrc2[l].im = ipdst[l].im;
+			}
+
+
+			//do IFFT
+			ippsFFTInv_CToC_32fc(ipsrc2, ipdst2, speci, workbufi);
+			ippsZero_8u(workbufi, size_worki);
+
+			//save
+			for (int l = 0; l < 4 * sample; ++l){
+				elere[j][k][l] = 4 * sample * ipdst2[l].re;
+				eleim[j][k][l] = 4 * sample * ipdst2[l].im;
+			}
+			ippsZero_32fc(ipdst2, 4 * sample);
+		}
+	}
+
+	//free IPP array
+	ippsFree(ipsrc);
+	ippsFree(ipdst);
+	ippsFree(ipdst2);
+	//free RF
+	raw.freeRF0();
+	cout << "finished creating AS!\n";
+
+
+	/*estimation distribution of sound speed(main part)*/
+
+	//定数変数の設定
+	int tryN = 11; //繰り返し回数
+	vector<float> cc(tryN, 0); //音速セット
+	for (int i = 0; i < tryN; ++i)
+		cc[i] = 1540.0 + (i - (tryN - 1) / 2) * 10.0;
+	vector<float> xi(ch, 0); // x-coordinate of each element
+	for (int i = 0; i < ch; ++i)
+		xi[i] = 0.2 * (47.5 - i) * 1e+3; //um
+	vector<float> theta(line, 0);
+	for (int i = 0; i < line; ++i) //beam angle
+		theta[i] = max_angle * ((line - 1) / 2 - i) * (M_PI / 180.0);
+	int aarea = 4;
+	vector<vector<int>> apf(line, vector<int>(aarea, 0)); //ラインごとの解析点
+	for (int i = 0; i < line; ++i){
+		//解析点の決定
+		for (int j = 0; j < aarea; ++j){
+			auto it = next(elere[i][finest_ele].begin(), j * (4 * sample) / aarea);
+			auto maxit = max_element(it, next(it, (4 * sample) / aarea));
+			if (j == 0)
+				maxit = max_element(next(it, (4 * sample) / aarea / 2), next(it, (4 * sample) / aarea));
+			else if (j == aarea - 1)
+				maxit = max_element(it, prev(elere[i][finest_ele].end(), (4 * sample) / aarea / 2));
+			apf[i][j] = distance(elere[i][finest_ele].begin(), maxit);
+		}
+	}
+	float dep; //解析深さ[um]
+	int ap; //解析点
+	float apdecimal; //小数あり
+	//ここまで
+
+	//ビーム→テスト音速→チャンネル
+
+	for (int i = 0; i < line; ++i){
+
+		for (int j = 0; j < tryN; ++j){
+
+			for (int k = 0; k < aarea; ++k){
+				//深さを判定する
+				dep = (pow(cc[j] * apf[i][k] / (4 * frq_s), 2) - pow(xi[finest_ele], 2)) / 2 / (cc[j] * apf[i][k] / (4 * frq_s) - xi[finest_ele] * sin(theta[i]));
+				for (int l = 0; l < ch; ++l){
+					auto check_broken = find(b_ele.begin(), b_ele.end(), l);
+					if (check_broken == b_ele.end()){
+						apdecimal = (4 * frq_s) / cc[j] * (dep + sqrt(pow(dep, 2) + pow(xi[l], 2) - 2 * dep * xi[l] * sin(theta[i])));
+						ap = static_cast<int>(apdecimal);
+						if (apdecimal - static_cast<int>(apdecimal) >= 0.5)
+							++ap;
+						
+						
+
+					
+
+
+
+					}
+				}
+
+			}
+
+		}
+
+	}
+
+
+
+
+
+	cout << "finish!\n";
+
+	cout << "!?\n";
+
+
+
+
+
+
+
+
+
+
+
+
+
+	//frame = 2;
+	//initialize focused RF array(vector)
+	//vector<vector<vector<vector<float>>>> elere(frame,
+	//	vector<vector<vector<float>>>(line, vector<vector<float>>(ch, vector<float>(4 * sample, 0))));
+	//vector<vector<vector<vector<float>>>> eleim(frame,
+	//	vector<vector<vector<float>>>(line, vector<vector<float>>(ch, vector<float>(4 * sample, 0))));
+
+	////spec and buffer setting for FFT
+	//Ipp8u *specbuff, *initbuff, *workbuff;
+	//Ipp8u *specbufi, *initbufi, *workbufi;
+	//int size_specf, size_initf, size_workf;
+	//int size_speci, size_initi, size_worki;
+	//IppsFFTSpec_C_32fc *specf = 0;
+	//IppsFFTSpec_C_32fc *speci = 0;
+	//Ipp32fc *ipsrc = ippsMalloc_32fc((int)sample);
+	//Ipp32fc *ipdst = ippsMalloc_32fc((int)sample);
+	//Ipp32fc *ipsrc2 = ippsMalloc_32fc((int)(4 * sample));
+	//Ipp32fc *ipdst2 = ippsMalloc_32fc((int)(4 * sample));
+	//const int fftorder = (int)(log((double)sample) / log(2.0));
+	//const int ifftorder = (int)(log((double)(4 * sample)) / log(2.0));
+	//ippsFFTGetSize_C_32fc(fftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, &size_specf, &size_initf, &size_workf);
+	//ippsFFTGetSize_C_32fc(ifftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, &size_speci, &size_initi, &size_worki);
+	//specbuff = ippsMalloc_8u(size_specf);
+	//specbufi = ippsMalloc_8u(size_speci);
+	//initbuff = ippsMalloc_8u(size_initf);
+	//initbufi = ippsMalloc_8u(size_initi);
+	//workbuff = ippsMalloc_8u(size_workf);
+	//workbufi = ippsMalloc_8u(size_worki);
+	//ippsFFTInit_C_32fc(&specf, fftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, specbuff, initbuff);
+	//ippsFFTInit_C_32fc(&speci, ifftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, specbufi, initbufi);
+	//
+	//for (int i = 0; i < frame; ++i){
+	//	for (int j = 0; j < line; ++j){
+	//		for (int k = 0; k < ch; ++k){
+	//			ippsZero_32fc(ipsrc, sample);
+	//			ippsZero_32fc(ipdst, sample);
+	//			ippsZero_32fc(ipsrc2, 4 * sample);
+	//			ippsZero_32fc(ipdst2, 4 * sample);
+	//			//set
+	//			for (int l = 0; l < sample - 1; ++l)
+	//				ipsrc[l].re = raw.RF[i][j][k][l];
+	//				//ipsrc[l].re = raw.RF[60][j][k][l] - raw.RF[59][j][k][l];
+	//
+	//			//do FFT
+	//			ippsFFTFwd_CToC_32fc(ipsrc, ipdst, specf, workbuff);
+	//			ippsZero_8u(workbuff, size_workf);
+	//			//double positive part and delete negative part
+	//			for (int l = 0; l < sample / 2; ++l){
+	//				ipdst[l].re = ipdst[l].re * 2 / sample;
+	//				ipdst[l].im = ipdst[l].im * 2 / sample;
+	//				ipdst[l + sample / 2].re = 0.0;
+	//				ipdst[l + sample / 2].im = 0.0;
+	//			}
+	//			for (int l = 0; l < 34; ++l){
+	//				ipdst[l].re = 0.0;
+	//				ipdst[l].im = 0.0;
+	//			}
+	//			
+	//			
+	//			//ipdst[0].re /= 2;
+	//			//ipdst[0].im /= 2;
+
+	//			for (int l = 0; l < sample; ++l){
+	//				ipsrc2[l].re = ipdst[l].re;
+	//				ipsrc2[l].im = ipdst[l].im;
+	//			}
+
+
+	//			//do IFFT
+	//			ippsFFTInv_CToC_32fc(ipsrc2, ipdst2, speci, workbufi);
+	//			ippsZero_8u(workbufi, size_worki);
+	//			
+	//			//save
+	//			for (int l = 0; l < 4 * sample; ++l){
+	//				elere[i][j][k][l] = 4 * sample * ipdst2[l].re;
+	//				eleim[i][j][k][l] = 4 * sample * ipdst2[l].im;
+	//			}
+	//			ippsZero_32fc(ipdst2, 4 * sample);
+	//		}
+	//	}
 	//}
 
-	//GN gn(xx, yy);
-	//gn.solve(45.5e3, 1540.0);
+	////free IPP array
+	//ippsFree(ipsrc);
+	//ippsFree(ipdst);
+	//ippsFree(ipdst2);
+	////free RF
+	////vector<vector<vector<vector<short>>>>().swap(RF);
+	//raw.freeRF();
 
+	///* interpolation */
+	//cout << "interpolating...\n";
 
-	raw.loadRF0(0);
+	//vector<vector<vector<float>>> RFre(frame, vector<vector<float>>(line, vector<float>(sample, 0)));
+	//vector<vector<vector<float>>> RFim(frame, vector<vector<float>>(line, vector<float>(sample, 0)));
+
+	////calculate delay
+	//const float c0 = 1540.0;
+	//int point, add;
+	//float eledep; //in-bound(um)
+	//float decimal; //decimal part in sampling point of round trip distance
+	//vector<float> xi(ch, 0); // x-coordinate of each element
+	//for (int i = 0; i < ch; ++i)
+	//	xi[i] = 0.2 * (47.5 - i) * 1e+3; //um
+	//vector<float> theta(line, 0);
+	//for (int i = 0; i < line; ++i) //beam angle
+	//	theta[i] = max_angle * ((line - 1) / 2 - i) * (M_PI / 180.0);
+	//vector<float> cendep(sample, 0);
+	//for (int i = 0; i < sample; ++i)
+	//	cendep[i] = i * (c0 / (2 * frq_s)); //out-bound(um)
+
+	////addition
+	//for (int i = 0; i < frame; ++i){
+	//	for (int j = 0; j < line; ++j){
+	//		for (int k = 0; k < sample; ++k){
+	//			add = 0;
+	//			for (int l = 0; l < ch; ++l){
+	//				eledep = sqrt(pow(xi[l], 2) + pow(cendep[k], 2) - 2 * xi[l] * cendep[k] * sin(theta[j]));
+	//				point = static_cast<int>(((cendep[k] + eledep) / 2) / (c0 / (8 * frq_s)));
+	//				decimal = ((cendep[k] + eledep) / 2) / (c0 / (8 * frq_s)) - point;
+	//				if (point < 4 * sample - 1){
+	//					RFre[i][j][k] += (elere[i][j][l][point] + (elere[i][j][l][point + 1] - elere[i][j][l][point]) * decimal);
+	//					RFim[i][j][k] += (eleim[i][j][l][point] + (eleim[i][j][l][point + 1] - eleim[i][j][l][point]) * decimal);
+	//					//RFre[i][j][k] += elere[i][j][l][point];
+	//					//RFim[i][j][k] += eleim[i][j][l][point];
+	//					++add;
+	//				}
+	//			}
+	//			if (add != 0){
+	//				RFre[i][j][k] /= add;
+	//				RFim[i][j][k] /= add;
+	//			}
+	//			else{
+	//				RFre[i][j][k] = 0.0;
+	//				RFim[i][j][k] = 0.0;
+	//			}
+	//		}
+	//	}
+	//}
+
+	////free eledata
+	//vector<vector<vector<vector<float>>>>().swap(elere);
+	//vector<vector<vector<vector<float>>>>().swap(eleim);
+
+	//vector<vector<vector<float>>> env(frame, vector<vector<float>>(line, vector<float>(sample, 0)));
+	//for (int i = 0; i < frame; ++i)
+	//		for (int k = 0; k < sample; ++k)
+	//			env[i][j][k] = sqrt(pow(RFre[i][j][k], 2) + pow(RFim[i][j][k], 2));
 
 	//int bn;
 	////cin >> bn;
@@ -734,415 +977,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	//	fout << "\n";
 	//}
 	//fout.close();
-
-	
-
-	cout << "creating analytic signal...\n";
-
-	vector<vector<vector<float>>> elere(line, vector<vector<float>>(ch, vector<float>(4 * sample, 0)));
-	vector<vector<vector<float>>> eleim(line, vector<vector<float>>(ch, vector<float>(4 * sample, 0)));
-
-	//spec and buffer setting for FFT
-	Ipp8u *specbuff, *initbuff, *workbuff;
-	Ipp8u *specbufi, *initbufi, *workbufi;
-	int size_specf, size_initf, size_workf;
-	int size_speci, size_initi, size_worki;
-	IppsFFTSpec_C_32fc *specf = 0;
-	IppsFFTSpec_C_32fc *speci = 0;
-	Ipp32fc *ipsrc = ippsMalloc_32fc((int)sample);
-	Ipp32fc *ipdst = ippsMalloc_32fc((int)sample);
-	Ipp32fc *ipsrc2 = ippsMalloc_32fc((int)(4 * sample));
-	Ipp32fc *ipdst2 = ippsMalloc_32fc((int)(4 * sample));
-	const int fftorder = (int)(log((double)sample) / log(2.0));
-	const int ifftorder = (int)(log((double)(4 * sample)) / log(2.0));
-	ippsFFTGetSize_C_32fc(fftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, &size_specf, &size_initf, &size_workf);
-	ippsFFTGetSize_C_32fc(ifftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, &size_speci, &size_initi, &size_worki);
-	specbuff = ippsMalloc_8u(size_specf);
-	specbufi = ippsMalloc_8u(size_speci);
-	initbuff = ippsMalloc_8u(size_initf);
-	initbufi = ippsMalloc_8u(size_initi);
-	workbuff = ippsMalloc_8u(size_workf);
-	workbufi = ippsMalloc_8u(size_worki);
-	ippsFFTInit_C_32fc(&specf, fftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, specbuff, initbuff);
-	ippsFFTInit_C_32fc(&speci, ifftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, specbufi, initbufi);
-
-	for (int j = 0; j < line; ++j){
-		for (int k = 0; k < ch; ++k){
-			ippsZero_32fc(ipsrc, sample);
-			ippsZero_32fc(ipdst, sample);
-			ippsZero_32fc(ipsrc2, 4 * sample);
-			ippsZero_32fc(ipdst2, 4 * sample);
-			//set
-			for (int l = 0; l < sample - 1; ++l)
-				ipsrc[l].re = raw.RF0[j][k][l];
-			//ipsrc[l].re = raw.RF[60][j][k][l] - raw.RF[59][j][k][l];
-
-			//do FFT
-			ippsFFTFwd_CToC_32fc(ipsrc, ipdst, specf, workbuff);
-			ippsZero_8u(workbuff, size_workf);
-			//double positive part and delete negative part
-			for (int l = 0; l < sample / 2; ++l){
-				ipdst[l].re = ipdst[l].re * 2 / sample;
-				ipdst[l].im = ipdst[l].im * 2 / sample;
-				ipdst[l + sample / 2].re = 0.0;
-				ipdst[l + sample / 2].im = 0.0;
-			}
-			for (int l = 0; l < 34; ++l){
-				ipdst[l].re = 0.0;
-				ipdst[l].im = 0.0;
-			}
-
-
-			//ipdst[0].re /= 2;
-			//ipdst[0].im /= 2;
-
-			for (int l = 0; l < sample; ++l){
-				ipsrc2[l].re = ipdst[l].re;
-				ipsrc2[l].im = ipdst[l].im;
-			}
-
-
-			//do IFFT
-			ippsFFTInv_CToC_32fc(ipsrc2, ipdst2, speci, workbufi);
-			ippsZero_8u(workbufi, size_worki);
-
-			//save
-			for (int l = 0; l < 4 * sample; ++l){
-				elere[j][k][l] = 4 * sample * ipdst2[l].re;
-				eleim[j][k][l] = 4 * sample * ipdst2[l].im;
-			}
-			ippsZero_32fc(ipdst2, 4 * sample);
-		}
-	}
-
-	//free IPP array
-	ippsFree(ipsrc);
-	ippsFree(ipdst);
-	ippsFree(ipdst2);
-	//free RF
-	//vector<vector<vector<vector<short>>>>().swap(RF);
-	raw.freeRF0();
-
-	/* interpolation */
-	cout << "interpolating...\n";
-
-	vector<vector<float>> RFre(line, vector<float>(sample, 0));
-	vector<vector<float>> RFim(line, vector<float>(sample, 0));
-
-	vector<vector<float>> env(line, vector<float>(sample, 0));
-
-	//calculate delay
-	//const float c0 = 1540.0;
-	
-	int tryN = 21;
-	vector<float> xi(ch, 0); // x-coordinate of each element
-	for (int i = 0; i < ch; ++i)
-		xi[i] = 0.2 * (47.5 - i) * 1e+3; //um
-	vector<float> theta(line, 0);
-	for (int i = 0; i < line; ++i) //beam angle
-		theta[i] = max_angle * ((line - 1) / 2 - i) * (M_PI / 180.0);
-
-	int point, add;
-	float eledep; //in-bound(um)
-	float decimal; //decimal part in sampling point of round trip distance
-	float cc; //set of sound speed
-
-	//kernel size
-	int kbeam = 13;
-	int kaxial = 512;
-	int nbeam = 5;
-	int naxial = 5;
-
-	////FQF
-	vector<vector<float>> contr(nbeam * naxial, vector<float>(tryN, 0));
-	vector<float> Lmaxvec(kbeam, 0);
-	vector<float> Lminvec(kbeam, 0);
-	float Lmax, Lmin;
-
-	vector<vector<float>> variance(nbeam * naxial, vector<float>(tryN, 0));
-	float sum;
-	
-	vector<float> cendep(sample, 0);
-
-	cout << "start iteration of a set of sound speed\n";
-	for (int i = 0; i < tryN; ++i){
-
-		cc = 1540.0 + (i - (tryN - 1) / 2) * 10.0;
-		cout << "sound speed: " << cc << " m/s\n";
-		for (int j = 0; j < sample; ++j)
-			cendep[j] = j * (cc / (2 * frq_s)); //out-bound(um)
-
-		//addition
-		for (int j = 0; j < line; ++j){
-			for (int k = 0; k < sample; ++k){
-				add = 0;
-				for (int l = 0; l < ch; ++l){
-					eledep = sqrt(pow(xi[l], 2) + pow(cendep[k], 2) - 2 * xi[l] * cendep[k] * sin(theta[j]));
-					point = static_cast<int>(((cendep[k] + eledep) / 2) / (cc / (8 * frq_s)));
-					decimal = ((cendep[k] + eledep) / 2) / (cc / (8 * frq_s)) - point;
-					if (point < 4 * sample - 1){
-						RFre[j][k] += (elere[j][l][point] + (elere[j][l][point + 1] - elere[j][l][point]) * decimal);
-						RFim[j][k] += (eleim[j][l][point] + (eleim[j][l][point + 1] - eleim[j][l][point]) * decimal);
-						//RFre[i][j][k] += elere[i][j][l][point];
-						//RFim[i][j][k] += eleim[i][j][l][point];
-						++add;
-					}
-
-					if (j == 60 && k == 20){
-						float phase = atan2(eleim[j][l][point] + (eleim[j][l][point + 1] - eleim[j][l][point]) * decimal, elere[j][l][point] + (elere[j][l][point + 1] - elere[j][l][point]) * decimal);
-						cout << "(ch, phase)=(" << l << ", " << phase << ")\n";
-					}
-
-				}
-				if (add != 0){
-					RFre[j][k] /= add;
-					RFim[j][k] /= add;
-				}
-				else{
-					RFre[j][k] = 0.0;
-					RFim[j][k] = 0.0;
-				}
-			}
-		}
-
-		vector<float> envmaxvec(line, 0);
-		float envmax;
-		float gain = 50.0;
-		for (int j = 0; j < line; ++j){
-			for (int k = 0; k < sample; ++k){
-				env[j][k] = sqrt(pow(RFre[j][k], 2) + pow(RFim[j][k], 2));
-			}
-		}
-
-		for (int j = 0; j < sample; ++j){
-			for (int k = 1; k < line - 1; ++k){
-				env[k][j] = abs(2 * env[k][j] - env[k + 1][j] - env[k - 1][j]);
-			}
-		}
-		
-		/*for (int j = 0; j < line; ++j){
-			envmaxvec[j] = *max_element(env[j].begin(), env[j].end());
-		}
-		envmax = *max_element(envmaxvec.begin(), envmaxvec.end());
-		for (int j = 0; j < line; ++j){
-			for (int k = 0; k < sample; ++k){
-				env[j][k] = 256 * (20.*log10(env[j][k] / envmax) + gain) / gain;
-				if (env[j][k] < 0) env[j][k] = 0.0;
-				if (env[j][k] > 255) env[j][k] = 255.0;
-				
-			}
-		}*/
-
-		//if (i == 10)
-			//BSector2(env, max_angle, frq_s);
-			
-
-		//evaluate FQF
-		for (int j = 0; j < nbeam; ++j){
-			for (int k = 0; k < naxial; ++k){
-
-				sum = 0;
-
-				for (int l = 0; l < kbeam; ++l){
-					vector<float>::iterator it1;
-					vector<float>::iterator it2;
-					it1 = env[(line - kbeam * nbeam) / 2 + j * kbeam + l].begin() + (sample - kaxial * naxial) / 2 + k * kaxial;
-					it2 = it1 + kaxial;
-					Lmaxvec[l] = *max_element(it1, it2);
-					Lminvec[l] = *min_element(it1, it2);
-
-					sum += accumulate(it1, it2, 0);
-				}
-				Lmax = *max_element(Lmaxvec.begin(), Lmaxvec.end());
-				Lmin = *min_element(Lminvec.begin(), Lminvec.end());
-				//cout << Lmax / Lmin << "\n";
-				//contr[j * naxial + k][i] = (Lmax - Lmin) / (Lmax + Lmin);
-				contr[j * naxial + k][i] = Lmax / Lmin;
-
-				sum /= (kbeam * kaxial);
-				for (int l = 0; l < kbeam; ++l){
-					for (int m = 0; m < kaxial; ++m){
-						variance[j * naxial + k][i] += pow(env[(line - kbeam * nbeam) / 2 + j * kbeam + l][(sample - kaxial * naxial) / 2 + k * kaxial + m] - sum, 2);
-					}
-				}
-				variance[j * naxial + k][i] /= (kbeam * kaxial);
-
-			}
-		}
-	}
-
-	ofstream fout;
-	ostringstream ost;
-
-	for (int i = 0; i < nbeam * naxial; ++i){
-		ost << "./phantom2/" << i << ".dat";
-		fout.open(ost.str(), ios_base::out);
-		ost.clear();
-		ost.str("");
-		for (int j = 0; j < tryN; ++j){
-			cout << "sound speed:" << 1540.0 + (j - (tryN - 1) / 2) * 10.0 << " m/s -> contrast:" << contr[i][j] << "\n";
-			cout << "sound speed:" << 1540.0 + (j - (tryN - 1) / 2) * 10.0 << " m/s -> variance:" << variance[i][j] << "\n";
-			fout << 1540 + (j - (tryN - 1) / 2) * 10 << " " << contr[i][j] << "\n";
-		}
-		fout.close();
-	}
-
-	//free eledata
-	vector<vector<vector<float>>>().swap(elere);
-	vector<vector<vector<float>>>().swap(eleim);
-
-
-
-	//frame = 2;
-	//initialize focused RF array(vector)
-	//vector<vector<vector<vector<float>>>> elere(frame,
-	//	vector<vector<vector<float>>>(line, vector<vector<float>>(ch, vector<float>(4 * sample, 0))));
-	//vector<vector<vector<vector<float>>>> eleim(frame,
-	//	vector<vector<vector<float>>>(line, vector<vector<float>>(ch, vector<float>(4 * sample, 0))));
-
-	////spec and buffer setting for FFT
-	//Ipp8u *specbuff, *initbuff, *workbuff;
-	//Ipp8u *specbufi, *initbufi, *workbufi;
-	//int size_specf, size_initf, size_workf;
-	//int size_speci, size_initi, size_worki;
-	//IppsFFTSpec_C_32fc *specf = 0;
-	//IppsFFTSpec_C_32fc *speci = 0;
-	//Ipp32fc *ipsrc = ippsMalloc_32fc((int)sample);
-	//Ipp32fc *ipdst = ippsMalloc_32fc((int)sample);
-	//Ipp32fc *ipsrc2 = ippsMalloc_32fc((int)(4 * sample));
-	//Ipp32fc *ipdst2 = ippsMalloc_32fc((int)(4 * sample));
-	//const int fftorder = (int)(log((double)sample) / log(2.0));
-	//const int ifftorder = (int)(log((double)(4 * sample)) / log(2.0));
-	//ippsFFTGetSize_C_32fc(fftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, &size_specf, &size_initf, &size_workf);
-	//ippsFFTGetSize_C_32fc(ifftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, &size_speci, &size_initi, &size_worki);
-	//specbuff = ippsMalloc_8u(size_specf);
-	//specbufi = ippsMalloc_8u(size_speci);
-	//initbuff = ippsMalloc_8u(size_initf);
-	//initbufi = ippsMalloc_8u(size_initi);
-	//workbuff = ippsMalloc_8u(size_workf);
-	//workbufi = ippsMalloc_8u(size_worki);
-	//ippsFFTInit_C_32fc(&specf, fftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, specbuff, initbuff);
-	//ippsFFTInit_C_32fc(&speci, ifftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, specbufi, initbufi);
-	//
-	//for (int i = 0; i < frame; ++i){
-	//	for (int j = 0; j < line; ++j){
-	//		for (int k = 0; k < ch; ++k){
-	//			ippsZero_32fc(ipsrc, sample);
-	//			ippsZero_32fc(ipdst, sample);
-	//			ippsZero_32fc(ipsrc2, 4 * sample);
-	//			ippsZero_32fc(ipdst2, 4 * sample);
-	//			//set
-	//			for (int l = 0; l < sample - 1; ++l)
-	//				ipsrc[l].re = raw.RF[i][j][k][l];
-	//				//ipsrc[l].re = raw.RF[60][j][k][l] - raw.RF[59][j][k][l];
-	//
-	//			//do FFT
-	//			ippsFFTFwd_CToC_32fc(ipsrc, ipdst, specf, workbuff);
-	//			ippsZero_8u(workbuff, size_workf);
-	//			//double positive part and delete negative part
-	//			for (int l = 0; l < sample / 2; ++l){
-	//				ipdst[l].re = ipdst[l].re * 2 / sample;
-	//				ipdst[l].im = ipdst[l].im * 2 / sample;
-	//				ipdst[l + sample / 2].re = 0.0;
-	//				ipdst[l + sample / 2].im = 0.0;
-	//			}
-	//			for (int l = 0; l < 34; ++l){
-	//				ipdst[l].re = 0.0;
-	//				ipdst[l].im = 0.0;
-	//			}
-	//			
-	//			
-	//			//ipdst[0].re /= 2;
-	//			//ipdst[0].im /= 2;
-
-	//			for (int l = 0; l < sample; ++l){
-	//				ipsrc2[l].re = ipdst[l].re;
-	//				ipsrc2[l].im = ipdst[l].im;
-	//			}
-
-
-	//			//do IFFT
-	//			ippsFFTInv_CToC_32fc(ipsrc2, ipdst2, speci, workbufi);
-	//			ippsZero_8u(workbufi, size_worki);
-	//			
-	//			//save
-	//			for (int l = 0; l < 4 * sample; ++l){
-	//				elere[i][j][k][l] = 4 * sample * ipdst2[l].re;
-	//				eleim[i][j][k][l] = 4 * sample * ipdst2[l].im;
-	//			}
-	//			ippsZero_32fc(ipdst2, 4 * sample);
-	//		}
-	//	}
-	//}
-
-	////free IPP array
-	//ippsFree(ipsrc);
-	//ippsFree(ipdst);
-	//ippsFree(ipdst2);
-	////free RF
-	////vector<vector<vector<vector<short>>>>().swap(RF);
-	//raw.freeRF();
-
-	///* interpolation */
-	//cout << "interpolating...\n";
-
-	//vector<vector<vector<float>>> RFre(frame, vector<vector<float>>(line, vector<float>(sample, 0)));
-	//vector<vector<vector<float>>> RFim(frame, vector<vector<float>>(line, vector<float>(sample, 0)));
-
-	////calculate delay
-	//const float c0 = 1540.0;
-	//int point, add;
-	//float eledep; //in-bound(um)
-	//float decimal; //decimal part in sampling point of round trip distance
-	//vector<float> xi(ch, 0); // x-coordinate of each element
-	//for (int i = 0; i < ch; ++i)
-	//	xi[i] = 0.2 * (47.5 - i) * 1e+3; //um
-	//vector<float> theta(line, 0);
-	//for (int i = 0; i < line; ++i) //beam angle
-	//	theta[i] = max_angle * ((line - 1) / 2 - i) * (M_PI / 180.0);
-	//vector<float> cendep(sample, 0);
-	//for (int i = 0; i < sample; ++i)
-	//	cendep[i] = i * (c0 / (2 * frq_s)); //out-bound(um)
-
-	////addition
-	//for (int i = 0; i < frame; ++i){
-	//	for (int j = 0; j < line; ++j){
-	//		for (int k = 0; k < sample; ++k){
-	//			add = 0;
-	//			for (int l = 0; l < ch; ++l){
-	//				eledep = sqrt(pow(xi[l], 2) + pow(cendep[k], 2) - 2 * xi[l] * cendep[k] * sin(theta[j]));
-	//				point = static_cast<int>(((cendep[k] + eledep) / 2) / (c0 / (8 * frq_s)));
-	//				decimal = ((cendep[k] + eledep) / 2) / (c0 / (8 * frq_s)) - point;
-	//				if (point < 4 * sample - 1){
-	//					RFre[i][j][k] += (elere[i][j][l][point] + (elere[i][j][l][point + 1] - elere[i][j][l][point]) * decimal);
-	//					RFim[i][j][k] += (eleim[i][j][l][point] + (eleim[i][j][l][point + 1] - eleim[i][j][l][point]) * decimal);
-	//					//RFre[i][j][k] += elere[i][j][l][point];
-	//					//RFim[i][j][k] += eleim[i][j][l][point];
-	//					++add;
-	//				}
-	//			}
-	//			if (add != 0){
-	//				RFre[i][j][k] /= add;
-	//				RFim[i][j][k] /= add;
-	//			}
-	//			else{
-	//				RFre[i][j][k] = 0.0;
-	//				RFim[i][j][k] = 0.0;
-	//			}
-	//		}
-	//	}
-	//}
-
-	////free eledata
-	//vector<vector<vector<vector<float>>>>().swap(elere);
-	//vector<vector<vector<vector<float>>>>().swap(eleim);
-
-	//vector<vector<vector<float>>> env(frame, vector<vector<float>>(line, vector<float>(sample, 0)));
-	//for (int i = 0; i < frame; ++i)
-	//		for (int k = 0; k < sample; ++k)
-	//			env[i][j][k] = sqrt(pow(RFre[i][j][k], 2) + pow(RFim[i][j][k], 2));
-
-
 
 
 
