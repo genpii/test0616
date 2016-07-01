@@ -194,10 +194,28 @@ int _tmain(int argc, _TCHAR* argv[])
 	float dep; //解析深さ[um]
 	int ap; //解析点
 	float apdecimal; //小数あり
+	bool for_ini; //開始素子とそれ以外を判別する
+	int next_ele; //生きている隣接素子番号
+	//相関計算に用いる
+	IppStatus status;
+	const int csrc1Len = 32;
+	const int csrc2Len = 4 * sample;
+	int lowLag = -5; // -lowLag * 2 + 1 が全遅延量
+	const int cdstLen = -2 * lowLag + 1;
+	Ipp32fc *csrc1 = ippsMalloc_32fc(csrc1Len);
+	Ipp32fc *csrc2 = ippsMalloc_32fc(csrc2Len);
+	Ipp32fc *cdst = ippsMalloc_32fc(cdstLen);
+	IppEnum NormA = (IppEnum)( ippAlgAuto | ippsNormA );
+	int bufsize = 0;
+	Ipp8u *pbuffer;
+	status = ippsCrossCorrNormGetBufferSize(csrc1Len, csrc2Len, cdstLen, lowLag, ipp32fc, NormA, &bufsize);
+	if (status != ippStsNoErr)
+		return status;
+	pbuffer = ippsMalloc_8u(bufsize);
 	//ここまで
 
 	//ビーム→テスト音速→チャンネル
-
+	
 	for (int i = 0; i < line; ++i){
 
 		for (int j = 0; j < tryN; ++j){
@@ -205,17 +223,38 @@ int _tmain(int argc, _TCHAR* argv[])
 			for (int k = 0; k < aarea; ++k){
 				//深さを判定する
 				dep = (pow(cc[j] * apf[i][k] / (4 * frq_s), 2) - pow(xi[finest_ele], 2)) / 2 / (cc[j] * apf[i][k] / (4 * frq_s) - xi[finest_ele] * sin(theta[i]));
-				for (int l = 0; l < ch; ++l){
+				for_ini = false;
+				for (int l = 0; l < ch; ++l){ //隣接素子をリレーして相関を取る->コンテナの入れ替えを行う
 					auto check_broken = find(b_ele.begin(), b_ele.end(), l);
+
+
+
 					if (check_broken == b_ele.end()){
 						apdecimal = (4 * frq_s) / cc[j] * (dep + sqrt(pow(dep, 2) + pow(xi[l], 2) - 2 * dep * xi[l] * sin(theta[i])));
 						ap = static_cast<int>(apdecimal);
 						if (apdecimal - static_cast<int>(apdecimal) >= 0.5)
 							++ap;
-						
-						
+						if (!for_ini){ //最初の素子の場合初期化
+							
+							for (int m = 0; m < csrc1Len - 1; ++m){
+								csrc1[m].re = elere[i][l][apf[i][k] - csrc1Len / 2];
+								csrc1[m].im = eleim[i][l][apf[i][k] - csrc1Len / 2];
+							}
+							csrc1[csrc1Len - 1].re = 0.0;
+							csrc1[csrc1Len - 1].im = 0.0;
+							for (int m = 0; m < 4 * sample; ++m){
+								//csrc2[m].re = elere[i][]
+							}
 
-					
+
+							for_ini = true;
+						}
+						else //以降
+						{
+
+						}
+
+						
 
 
 
