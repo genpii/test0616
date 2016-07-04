@@ -12,6 +12,7 @@
 	stdafx.h - include C++ STL
 	header.h - header of hand-made classes and fuctions
 	graphics.h - reprodution of libXG library using Windows API
+
 	*/
 
 #include "stdafx.h"
@@ -35,6 +36,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	cout << "Load started.\n";
 
 	string RFdir = "D:/RFdata/study/20160617/2.crf";
+	RFdir = "52101_1.crf"; //X220
 	a10 raw(RFdir);
 
 	vector<int> b_ele; //故障した素子 <-後でクラスa10の方に組み込む予定
@@ -226,10 +228,17 @@ int _tmain(int argc, _TCHAR* argv[])
 				for_ini = false;
 				for (int l = 0; l < ch; ++l){ //隣接素子をリレーして相関を取る->コンテナの入れ替えを行う
 					auto check_broken = find(b_ele.begin(), b_ele.end(), l);
-
-
-
+										
 					if (check_broken == b_ele.end()){
+						//次に使える素子を検索
+						for (int m = l + 1; m < ch; ++l){
+							check_broken = find(b_ele.begin(), b_ele.end(), m);
+							if (check_broken == b_ele.end()){
+								next_ele = m;
+								break;
+							}
+						}
+												
 						apdecimal = (4 * frq_s) / cc[j] * (dep + sqrt(pow(dep, 2) + pow(xi[l], 2) - 2 * dep * xi[l] * sin(theta[i])));
 						ap = static_cast<int>(apdecimal);
 						if (apdecimal - static_cast<int>(apdecimal) >= 0.5)
@@ -242,16 +251,17 @@ int _tmain(int argc, _TCHAR* argv[])
 							}
 							csrc1[csrc1Len - 1].re = 0.0;
 							csrc1[csrc1Len - 1].im = 0.0;
-							for (int m = 0; m < 4 * sample; ++m){
-								//csrc2[m].re = elere[i][]
+							for (int m = 0; m < 4 * sample; ++m){					
+								csrc2[m].re = elere[i][next_ele][m];
+								csrc2[m].im = eleim[i][next_ele][m];
 							}
 
 
 							for_ini = true;
 						}
-						else //以降
+						else //以降は交換を行う(src2->src1)
 						{
-
+							;
 						}
 
 						

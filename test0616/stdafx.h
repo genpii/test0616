@@ -29,5 +29,5 @@
 #include <sstream> //stringstream
 #include <map>
 //#include <mkl.h> //IntelMKL
-#include "Eigen\core"
-#include "unsupported\Eigen\NonLinearOptimization"
+//#include "Eigen\core"
+//#include "unsupported\Eigen\NonLinearOptimization"
