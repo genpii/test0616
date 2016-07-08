@@ -28,6 +28,9 @@
 #include <array> //C++ STL”z—ñ
 #include <sstream> //stringstream
 #include <map>
+#include <iomanip>
+#include <stdexcept>
+#include <locale>
 //#include <mkl.h> //IntelMKL
 //#include "Eigen\core"
 //#include "unsupported\Eigen\NonLinearOptimization"
