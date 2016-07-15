@@ -288,11 +288,11 @@ int a10::plotRF0(string dir)
 	return 0;
 }
 
-vector<vector<double>> a10::calcenv(int frame, float max_angle, float frq_s)
+vector<vector<float>> a10::calcenv(int frame, float max_angle, float frq_s)
 {
 	if (RF0.empty()){
 		cout << "RF0 is empty.\n";
-		vector<vector<double>> dummy;
+		vector<vector<float>> dummy;
 		return dummy;
 	}
 
@@ -421,7 +421,7 @@ vector<vector<double>> a10::calcenv(int frame, float max_angle, float frq_s)
 	//vector<vector<vector<double>>>().swap(elere);
 	//vector<vector<vector<double>>>().swap(eleim);
 
-	vector<vector<double>> env(line, vector<double>(sample, 0));
+	vector<vector<float>> env(line, vector<float>(sample, 0));
 
 	for (int j = 0; j < line; ++j)
 		for (int k = 0; k < sample; ++k)

@@ -25,6 +25,7 @@ Global
 		{5A30B407-06C4-4C17-A4D1-6D1F7870DF2F}.Release|Mixed Platforms.Build.0 = Release|Win32
 		{5A30B407-06C4-4C17-A4D1-6D1F7870DF2F}.Release|Win32.ActiveCfg = Release|Win32
 		{5A30B407-06C4-4C17-A4D1-6D1F7870DF2F}.Release|Win32.Build.0 = Release|Win32
+		{5A30B407-06C4-4C17-A4D1-6D1F7870DF2F}.Release|Win32.Deploy.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

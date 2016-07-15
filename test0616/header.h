@@ -67,7 +67,7 @@ public:
 
 	//int plotRF0();
 	int plotRF0(string dir);
-	vector<vector<double>> calcenv(int frame, float max_angle, float frq_s);
+	vector<vector<float>> calcenv(int frame, float max_angle, float frq_s);
 };
 
 /*class of physio.cpp*/
