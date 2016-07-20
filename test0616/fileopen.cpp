@@ -13,7 +13,7 @@ file::file(string filename)
 	fin.open(filename, ios_base::in | ios_base::binary);
 	if (!fin){
 		cout << "couldn't load file.\n";
-		
+
 	}
 }
 
@@ -332,7 +332,7 @@ vector<vector<float>> a10::calcenv(int frame, float max_angle, float frq_s)
 	vector<double> xi(ch, 0); // x-coordinate of each element
 	for (int i = 0; i < ch; ++i)
 		xi[i] = 0.2 * (47.5 - i) * 1e+3; //um
-		//xi[i] = 0.2 * (i - 47.5) * 1e+3;
+	//xi[i] = 0.2 * (i - 47.5) * 1e+3;
 	vector<double> theta(line, 0);
 	for (int i = 0; i < line; ++i) //beam angle
 		theta[i] = max_angle * ((line - 1) / 2 - i) * (M_PI / 180.0);
@@ -433,6 +433,192 @@ vector<vector<float>> a10::calcenv(int frame, float max_angle, float frq_s)
 	return env;
 }
 
+int a10::generate_AS(){
+
+	if (RF0.empty()){
+		cout << "RF0 is empty!\n";
+		return 1;
+	}
+
+	Ipp8u *specbuff, *initbuff, *workbuff;
+	Ipp8u *specbufi, *initbufi, *workbufi;
+	int size_specf, size_initf, size_workf;
+	int size_speci, size_initi, size_worki;
+	IppsFFTSpec_C_32fc *specf = 0;
+	IppsFFTSpec_C_32fc *speci = 0;
+	Ipp32fc *ipsrc = ippsMalloc_32fc((int)sample);
+	Ipp32fc *ipdst = ippsMalloc_32fc((int)sample);
+	Ipp32fc *ipsrc2 = ippsMalloc_32fc((int)(4 * sample));
+	Ipp32fc *ipdst2 = ippsMalloc_32fc((int)(4 * sample));
+	const int fftorder = (int)(log((double)sample) / log(2.0));
+	const int ifftorder = (int)(log((double)(4 * sample)) / log(2.0));
+	ippsFFTGetSize_C_32fc(fftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, &size_specf, &size_initf, &size_workf);
+	ippsFFTGetSize_C_32fc(ifftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, &size_speci, &size_initi, &size_worki);
+	specbuff = ippsMalloc_8u(size_specf);
+	specbufi = ippsMalloc_8u(size_speci);
+	initbuff = ippsMalloc_8u(size_initf);
+	initbufi = ippsMalloc_8u(size_initi);
+	workbuff = ippsMalloc_8u(size_workf);
+	workbufi = ippsMalloc_8u(size_worki);
+	ippsFFTInit_C_32fc(&specf, fftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, specbuff, initbuff);
+	ippsFFTInit_C_32fc(&speci, ifftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, specbufi, initbufi);
+
+	if (elere.empty() && eleim.empty()){
+		elere = vector<vector<vector<float>>>(line, vector<vector<float>>(ch, vector<float>(4 * sample, 0)));
+		eleim = vector<vector<vector<float>>>(line, vector<vector<float>>(ch, vector<float>(4 * sample, 0)));
+	}
+
+	cout << "generating AS now...\n";
+	for (int j = 0; j < line; ++j){
+
+		for (int k = 0; k < ch; ++k){
+			ippsZero_32fc(ipsrc, sample);
+			ippsZero_32fc(ipdst, sample);
+			ippsZero_32fc(ipsrc2, 4 * sample);
+			ippsZero_32fc(ipdst2, 4 * sample);
+			//set
+			for (int l = 0; l < sample - 1; ++l)
+				ipsrc[l].re = RF0[j][k][l];
+			//ipsrc[l].re = raw.RF[60][j][k][l] - raw.RF[59][j][k][l];
+
+			//do FFT
+			ippsFFTFwd_CToC_32fc(ipsrc, ipdst, specf, workbuff);
+			ippsZero_8u(workbuff, size_workf);
+			//double positive part and delete negative part
+			for (int l = 0; l < sample / 2; ++l){
+				ipdst[l].re = ipdst[l].re * 2 / sample;
+				ipdst[l].im = ipdst[l].im * 2 / sample;
+				ipdst[l + sample / 2].re = 0.0;
+				ipdst[l + sample / 2].im = 0.0;
+			}
+			for (int l = 0; l < 34; ++l){
+				ipdst[l].re = 0.0;
+				ipdst[l].im = 0.0;
+			}
+
+
+			//ipdst[0].re /= 2;
+			//ipdst[0].im /= 2;
+
+			for (int l = 0; l < sample; ++l){
+				ipsrc2[l].re = ipdst[l].re;
+				ipsrc2[l].im = ipdst[l].im;
+			}
+
+
+			//do IFFT
+			ippsFFTInv_CToC_32fc(ipsrc2, ipdst2, speci, workbufi);
+			ippsZero_8u(workbufi, size_worki);
+
+			//save
+			for (int l = 0; l < 4 * sample; ++l){
+				elere[j][k][l] = 4 * sample * ipdst2[l].re;
+				eleim[j][k][l] = 4 * sample * ipdst2[l].im;
+			}
+			ippsZero_32fc(ipdst2, 4 * sample);
+		}
+	}
+	ippsFree(ipsrc);
+	ippsFree(ipdst);
+	ippsFree(ipsrc2);
+	ippsFree(ipdst2);
+
+	cout << "finished!\n";
+	return 0;
+}
+
+int a10::generate_AS(int sline){
+	if (RF0.empty()){
+		cout << "RF0 is empty!\n";
+		return 1;
+	}
+
+	Ipp8u *specbuff, *initbuff, *workbuff;
+	Ipp8u *specbufi, *initbufi, *workbufi;
+	int size_specf, size_initf, size_workf;
+	int size_speci, size_initi, size_worki;
+	IppsFFTSpec_C_32fc *specf = 0;
+	IppsFFTSpec_C_32fc *speci = 0;
+	Ipp32fc *ipsrc = ippsMalloc_32fc((int)sample);
+	Ipp32fc *ipdst = ippsMalloc_32fc((int)sample);
+	Ipp32fc *ipsrc2 = ippsMalloc_32fc((int)(4 * sample));
+	Ipp32fc *ipdst2 = ippsMalloc_32fc((int)(4 * sample));
+	const int fftorder = (int)(log((double)sample) / log(2.0));
+	const int ifftorder = (int)(log((double)(4 * sample)) / log(2.0));
+	ippsFFTGetSize_C_32fc(fftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, &size_specf, &size_initf, &size_workf);
+	ippsFFTGetSize_C_32fc(ifftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, &size_speci, &size_initi, &size_worki);
+	specbuff = ippsMalloc_8u(size_specf);
+	specbufi = ippsMalloc_8u(size_speci);
+	initbuff = ippsMalloc_8u(size_initf);
+	initbufi = ippsMalloc_8u(size_initi);
+	workbuff = ippsMalloc_8u(size_workf);
+	workbufi = ippsMalloc_8u(size_worki);
+	ippsFFTInit_C_32fc(&specf, fftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, specbuff, initbuff);
+	ippsFFTInit_C_32fc(&speci, ifftorder, IPP_FFT_NODIV_BY_ANY, ippAlgHintNone, specbufi, initbufi);
+
+	if (ele0re.empty() && ele0im.empty()){
+		ele0re = vector<vector<float>>(ch, vector<float>(4 * sample, 0));
+		ele0im = vector<vector<float>>(ch, vector<float>(4 * sample, 0));
+	}
+	cout << "generating AS now...\n";
+
+
+	for (int k = 0; k < ch; ++k){
+		ippsZero_32fc(ipsrc, sample);
+		ippsZero_32fc(ipdst, sample);
+		ippsZero_32fc(ipsrc2, 4 * sample);
+		ippsZero_32fc(ipdst2, 4 * sample);
+		//set
+		for (int l = 0; l < sample - 1; ++l)
+			ipsrc[l].re = RF0[sline][k][l];
+		//ipsrc[l].re = raw.RF[60][j][k][l] - raw.RF[59][j][k][l];
+
+		//do FFT
+		ippsFFTFwd_CToC_32fc(ipsrc, ipdst, specf, workbuff);
+		ippsZero_8u(workbuff, size_workf);
+		//double positive part and delete negative part
+		for (int l = 0; l < sample / 2; ++l){
+			ipdst[l].re = ipdst[l].re * 2 / sample;
+			ipdst[l].im = ipdst[l].im * 2 / sample;
+			ipdst[l + sample / 2].re = 0.0;
+			ipdst[l + sample / 2].im = 0.0;
+		}
+		for (int l = 0; l < 34; ++l){
+			ipdst[l].re = 0.0;
+			ipdst[l].im = 0.0;
+		}
+
+
+		//ipdst[0].re /= 2;
+		//ipdst[0].im /= 2;
+
+		for (int l = 0; l < sample; ++l){
+			ipsrc2[l].re = ipdst[l].re;
+			ipsrc2[l].im = ipdst[l].im;
+		}
+
+
+		//do IFFT
+		ippsFFTInv_CToC_32fc(ipsrc2, ipdst2, speci, workbufi);
+		ippsZero_8u(workbufi, size_worki);
+
+		//save
+		for (int l = 0; l < 4 * sample; ++l){
+			ele0re[k][l] = 4 * sample * ipdst2[l].re;
+			ele0im[k][l] = 4 * sample * ipdst2[l].im;
+		}
+		ippsZero_32fc(ipdst2, 4 * sample);
+	}
+
+	ippsFree(ipsrc);
+	ippsFree(ipdst);
+	ippsFree(ipsrc2);
+	ippsFree(ipdst2);
+
+	cout << "finished!\n";
+	return 0;
+}
+
 
 
 
@@ -515,3 +701,118 @@ void physio::write()
 
 	cout << "wrote physio data!\n";
 }
+
+/*ごみおきば*/
+
+//相関計算に用いる 相関はNCC(not ZNCC)
+//IppStatus status;
+//const int csrc1Len = 256;
+//const int csrc2Len = 4 * sample;
+//int lowLag = -256; // -lowLag * 2 + 1 が全遅延量
+//const int cdstLen = -2 * lowLag + 1;
+//int Lag;
+//Ipp32fc *csrc1 = ippsMalloc_32fc(csrc1Len);
+//Ipp64f csrc1Norm;
+//Ipp32fc *csrc2 = ippsMalloc_32fc(csrc2Len);
+//Ipp64f csrc2Normtmp;
+//Ipp64f *csrc2Norm = ippsMalloc_64f(cdstLen);
+//Ipp32f *csrcNorm = ippsMalloc_32f(cdstLen);
+//Ipp32fc *csrcNormCplx = ippsMalloc_32fc(cdstLen);
+//Ipp32f *cdstLenzeros = ippsMalloc_32f(cdstLen);
+//ippsZero_32f(cdstLenzeros, cdstLen);
+//Ipp32fc *cdst = ippsMalloc_32fc(cdstLen);
+//Ipp32f *cdstMag = ippsMalloc_32f(cdstLen);
+//Ipp32f *cdstPha = ippsMalloc_32f(cdstLen);
+//Ipp32f cmax;
+//int cmaxidx;
+//IppEnum NormA = (IppEnum)(ippAlgAuto | ippsNormNone);
+//int bufsize = 0;
+//Ipp8u *pbuffer;
+//status = ippsCrossCorrNormGetBufferSize(csrc1Len, csrc2Len, cdstLen, lowLag, ipp32fc, NormA, &bufsize);
+//if (status != ippStsNoErr)
+//	return status;
+//pbuffer = ippsMalloc_8u(bufsize);
+
+////ビーム→テスト音速→チャンネル
+////ofstream cfout("corr.dat", ios_base::out);
+//vector<vector<vector<float>>> corrre(ch, vector<vector<float>>(tryN, vector<float>(cdstLen, 0)));
+//vector<vector<vector<float>>> corrim(ch, vector<vector<float>>(tryN, vector<float>(cdstLen, 0)));
+//vector<vector<vector<float>>> corrmag(ch, vector<vector<float>>(tryN, vector<float>(cdstLen, 0)));
+//vector<vector<vector<float>>> corrpha(ch, vector<vector<float>>(tryN, vector<float>(cdstLen, 0)));
+////for (int i = 0; i < line; ++i){ //ライン
+//for (int i = cline; i < cline + 1; ++i){
+
+//	for (int j = 0; j < tryN; ++j){ //音速セット
+
+//		//for (int k = 0; k < aarea; ++k){ //エリア
+//		for (int k = carea; k < carea + 1; ++k){
+//			//src1セット
+//			ippsZero_32fc(csrc1, csrc1Len);
+//			Lagf = apf[i][k] - csrc1Len / 2 + 1;
+//			for (int l = 0; l < csrc1Len; ++l){
+//				csrc1[l].re = elere[i][finest_ele][Lagf + l];
+//				csrc1[l].im = eleim[i][finest_ele][Lagf + l];
+//			}
+//			csrc1Norm = 0.0;
+//			ippsNorm_L2_32fc64f(csrc1, csrc1Len, &csrc1Norm); //src1のノルム
+
+//			//深さを判定する
+//			dep = (pow(cc[5] * apf[i][k] / (4 * frq_s), 2) - pow(xi[finest_ele], 2)) / 2 / (cc[5] * apf[i][k] / (4 * frq_s) - xi[finest_ele] * sin(theta[i]));
+//			//for_ini = false;
+//			for (int l = 0; l < fine_ele.size(); ++l){
+//				if (l != finest_ele){
+//					//cout << "(" << i << " " << j << " " << k << " " << l << ")\n";
+//					ippsZero_32fc(csrc2, csrc2Len);
+//					ippsZero_32fc(cdst, cdstLen);
+//					ippsZero_32f(cdstMag, cdstLen);
+//					ippsZero_32f(cdstPha, cdstLen);
+//					ippsZero_64f(csrc2Norm, cdstLen);
+//					ippsZero_32f(csrcNorm, cdstLen);
+//					ippsZero_32fc(csrcNormCplx, cdstLen);
+//					//解析点の算出
+//					apdecimal = (4 * frq_s) / cc[j] * (dep + sqrt(pow(dep, 2) + pow(xi[fine_ele[l]], 2) - 2 * dep * xi[fine_ele[l]] * sin(theta[i])));
+//					ap = static_cast<int>(apdecimal);
+//					if (apdecimal - static_cast<int>(apdecimal) >= 0.5)
+//						++ap;
+//					Lag = ap - csrc1Len / 2 + 1;
+//					if (l == 30)
+//						cout << "ch:" << fine_ele[l] << "ss: " << cc[j] << "lag: " << dep << "\n";
+//					for (int m = 0; m < 4 * sample; ++m){ //csrc2を設定
+//						csrc2[m].re = elere[i][fine_ele[l]][m];
+//						csrc2[m].im = eleim[i][fine_ele[l]][m];
+//					}
+//					//相関
+//					status = ippsCrossCorrNorm_32fc(csrc1, csrc1Len, csrc2, csrc2Len, cdst, cdstLen, Lag + lowLag, NormA, pbuffer);
+
+//					for (int m = 0; m < cdstLen; ++m){ //src2のノルム
+//						csrc2Normtmp = 0.0;
+//						ippsNorm_L2_32fc64f(csrc2 + Lag + lowLag + m, csrc1Len, &csrc2Normtmp);
+//						csrc2Norm[m] = csrc2Normtmp;
+//					}
+//					ippsMulC_64f_I(csrc1Norm, csrc2Norm, cdstLen); //src1のノルム*src2のノルム
+//					ippsConvert_64f32f(csrc2Norm, csrcNorm, cdstLen); //double->float
+//					ippsRealToCplx_32f(csrcNorm, cdstLenzeros, csrcNormCplx, cdstLen); //実数列->複素列
+//					//ippsDiv_32fc_I(csrcNormCplx, cdst, cdstLen); //正規化
+//					ippsMagnitude_32fc(cdst, cdstMag, cdstLen); //相関振幅
+//					ippsPhase_32fc(cdst, cdstPha, cdstLen); //相関位相
+//					ippsMaxIndx_32f(cdstMag, cdstLen, &cmax, &cmaxidx);
+//					for (int m = 0; m < cdstLen; ++m){
+//						corrre[fine_ele[l]][j][m] = cdst[m].re;
+//						corrim[fine_ele[l]][j][m] = cdst[m].im;
+//						corrmag[fine_ele[l]][j][m] = cdstMag[m];
+//						corrpha[fine_ele[l]][j][m] = cdstPha[m];
+//					}
+
+
+//					//結果を出力
+//					//cout << "Max:" << cmax << ", Diff: " << cmaxidx + lowLag << "\n";
+
+//					//cfout << cc[j] << " " << fine_ele[l] << " " << cmaxidx + lowLag << "\n";
+//				}
+//			}
+//		}
+//		//cfout << "\n";
+//	}
+
+//}
+//cfout.close();

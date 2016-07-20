@@ -94,6 +94,7 @@
   <ItemGroup>
     <ClCompile Include="Bsector_WinAPI.cpp" />
     <ClCompile Include="fileopen.cpp" />
+    <ClCompile Include="functions.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

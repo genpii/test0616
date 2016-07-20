@@ -18,6 +18,8 @@ void writev(vector<float> &v, float &sc, string &str);
 vector<float> NormCC(const vector<float> &x1, const vector<float> &x2, int lag, int offset);
 vector<float> pwrspe(const vector<float> &v, const int &order);
 
+/* Intel IPP */
+IppStatus CrossCorrNormExample(void);
 
 
 /*class of fileopen.cpp*/
@@ -50,6 +52,14 @@ public:
 	double RF_size;
 	vector<vector<vector<vector<short>>>> RF;
 	vector<vector<vector<short>>> RF0;
+	
+	//フレームごとの処理
+	vector<vector<vector<float>>> elere;
+	vector<vector<vector<float>>> eleim;
+
+	//1ライン限定
+	vector<vector<float>> ele0re;
+	vector<vector<float>> ele0im;
 
 	//function
 	a10();
@@ -67,6 +77,10 @@ public:
 
 	//int plotRF0();
 	int plotRF0(string dir);
+
+	int generate_AS();
+	int generate_AS(int sline);
+
 	vector<vector<float>> calcenv(int frame, float max_angle, float frq_s);
 };
 
@@ -163,4 +177,40 @@ public:
 struct Point2D
 {
 	double x, y;
+};
+
+struct misra1a_functor
+{
+	misra1a_functor(int inputs, int values, double *x, double *y)
+		: inputs_(inputs), values_(values), x(x), y(y) {}
+
+	double *x;
+	double *y;
+
+	double p = 0.2e3;
+	double l = 9.5e3;
+	double sn = 0.15646446504;
+
+	// 目的関数
+	int operator()(const Eigen::VectorXd& b, Eigen::VectorXd& fvec) const
+	{
+		for (int i = 0; i < values_; ++i) {
+			fvec[i] = (b[0] + sqrt(pow(p * x[i], 2) + 2.0 * (b[0] * sn - l)*p*x[i] + pow(b[0], 2) + pow(l, 2) - 2.0 * b[0] * l*sn)) / b[1] - y[i];
+		}
+		return 0;
+	}
+	// 微分,ヤコビアン
+	int df(const Eigen::VectorXd& b, Eigen::MatrixXd& fjac)
+	{
+		for (int i = 0; i < values_; ++i) {
+			fjac(i, 0) = 1 / b[1] + (b[0] + sn*(p*x[i] - l)) / sqrt(pow(p * x[i], 2) + 2.0 * (b[0] * sn - l)*p*x[i] + pow(b[0], 2) + pow(l, 2) - 2.0 * b[0] * l*sn);
+			fjac(i, 1) = -(b[0] + sqrt(pow(p * x[i], 2) + 2.0 * (b[0] * sn - l)*p*x[i] + pow(b[0], 2) + pow(l, 2) - 2.0 * b[0] * l*sn)) / b[1] / b[1];
+		}
+		return 0;
+	}
+
+	const int inputs_;
+	const int values_;
+	int inputs() const { return inputs_; }
+	int values() const { return values_; }
 };
