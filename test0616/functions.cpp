@@ -49,6 +49,31 @@ IppStatus CrossCorrNormExample(void) {
 	return status;
 }
 
+void SimpleMovingAverage(vector<float> &src, int N){
+	int length = src.size();
+	int half = (N - 1) / 2;
+	float tmp;
+	vector<float> dst(length, 0);
 
+	for (int i = 0; i < half; ++i){ //‘O•û‹«ŠE
+		tmp = 0.0;
+		for (int j = 0; j <= half + i; ++j)
+			tmp += src[i + j];
+		dst[i] = tmp / static_cast<float>(half + i);
+	}
+	for (int i = half; i < length - half; ++i){ //”ñ‹«ŠE
+		tmp = 0.0;
+		for (int j = -half; j <= half; ++j)
+			tmp += src[i + j];
+		dst[i] = tmp / static_cast<float>(N);
+	}
+	for (int i = length - half; i < length; ++i){ //Œã•û‹«ŠE
+		tmp = 0.0;
+		for (int j = -half; j < length - i; ++j)
+			tmp += src[i + j];
+		dst[i] = tmp / static_cast<float>(length - i + half);
+	}
+	src = dst;
+}
 
 /* Eigen */

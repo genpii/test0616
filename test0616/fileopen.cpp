@@ -272,7 +272,7 @@ int a10::plotRF0(string dir)
 
 	for (int i = 0; i < line; ++i){
 		/*ost << "./" << dir << "/" << i << ".dat";*/
-		ost << "./" << dir << i << ".dat";
+		ost << "./0729/" << /*dir <<*/ i << ".dat";
 		fout.open(ost.str(), ios_base::out);
 		ost.clear();
 		ost.str("");
@@ -587,6 +587,7 @@ int a10::generate_AS(int sline){
 			ipdst[l].re = 0.0;
 			ipdst[l].im = 0.0;
 		}
+		
 
 
 		//ipdst[0].re /= 2;

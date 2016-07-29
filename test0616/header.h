@@ -21,6 +21,8 @@ vector<float> pwrspe(const vector<float> &v, const int &order);
 /* Intel IPP */
 IppStatus CrossCorrNormExample(void);
 
+void SimpleMovingAverage(vector<float> &src, int N);
+
 
 /*class of fileopen.cpp*/
 class file {
