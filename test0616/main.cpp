@@ -25,10 +25,9 @@ namespace plt = matplotlibcpp;
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-
+	Py_SetPythonHome("C:/Python27/");
 	//ダイナミックフォーカスを行うかどうか
 	bool dynamic_f = true;
-
 
 
 
@@ -67,7 +66,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	//string RFdir("D:/RFdata/study/20160617/2.crf");
 	//RFdir = "52101_1.crf"; //X220
 	//a10 raw(*RFdir);
-	a10 raw("D:/RFdata/study/20160729/1.crf");
+	//a10 raw("D:/RFdata/study/20160729/1.crf");
+	a10 raw("./20160729/1.crf");
 
 
 	raw.frq_s = 30.0; //30MHzにしておく
@@ -134,9 +134,19 @@ int _tmain(int argc, _TCHAR* argv[])
 		//yy[i] = log(sqrt(pow(raw.ele0re[47][i], 2) + pow(raw.ele0im[47][i], 2)));
 		yyy[i] = static_cast<float>(yy[i]);
 	}
-	SimpleMovingAverage(yyy, 15);
-	plt::plot(xx, yyy, "-");
-	plt::show();
+	HanningMovingAverage(yyy, 21);
+	vector<int> peak = PeakDetection(yyy);
+	string str = "yyy.dat";
+	PlotVector(yyy, str);
+	str = "peak.dat";
+	ofstream foutt(str, ios_base::out);
+	for (int i = 0; i < peak.size(); ++i)
+		foutt << peak[i] << " " << yyy[peak[i]] << "\n";
+	foutt.close();
+	//plt::plot(xx, yyy, "-");
+	//plt::plot(peak, yyy, ".");
+	//plt::grid(true);
+	//plt::show();
 
 	//相関計算に用いる定数変数の設定
 	int tryN = 81; //繰り返し回数

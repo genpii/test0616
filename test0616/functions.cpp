@@ -57,9 +57,9 @@ void SimpleMovingAverage(vector<float> &src, int N){
 
 	for (int i = 0; i < half; ++i){ //‘O•û‹«ŠE
 		tmp = 0.0;
-		for (int j = 0; j <= half + i; ++j)
+		for (int j = -i; j <= half + i; ++j)
 			tmp += src[i + j];
-		dst[i] = tmp / static_cast<float>(half + i);
+		dst[i] = tmp / static_cast<float>(half + i + 1);
 	}
 	for (int i = half; i < length - half; ++i){ //”ñ‹«ŠE
 		tmp = 0.0;
@@ -73,7 +73,64 @@ void SimpleMovingAverage(vector<float> &src, int N){
 			tmp += src[i + j];
 		dst[i] = tmp / static_cast<float>(length - i + half);
 	}
+
 	src = dst;
+}
+
+void HanningMovingAverage(vector<float> &src, int N){
+	int length = src.size();
+	int half = (N - 1) / 2;
+	float tmp;
+	vector<float> dst(length, 0);
+	vector<float> han(N, 0);
+	for (int i = 0; i < N; ++i)
+		han[i] = 0.5 - 0.5 * cos(2.0 * M_PI * i / (N - 1));
+	
+	for (int i = 0; i < half; ++i){ //‘O•û‹«ŠE
+		tmp = 0.0;
+		for (int j = -i; j <= half + i; ++j)
+			tmp += src[i + j] * han[j + half];
+		dst[i] = tmp / static_cast<float>(half + i + 1);
+	}
+	for (int i = half; i < length - half; ++i){ //”ñ‹«ŠE
+		tmp = 0.0;
+		for (int j = -half; j <= half; ++j)
+			tmp += src[i + j] * han[j + half];
+		dst[i] = tmp / static_cast<float>(N);
+	}
+	for (int i = length - half; i < length; ++i){ //Œã•û‹«ŠE
+		tmp = 0.0;
+		for (int j = -half; j < length - i; ++j)
+			tmp += src[i + j] * han[j + half];
+		dst[i] = tmp / static_cast<float>(length - i + half);
+	}
+
+	src = dst;
+}
+
+vector<int> PeakDetection(const vector<float> &src){
+	vector<int> dst;
+	for (int i = 1; i < src.size() - 1; ++i){
+		if (src[i] > src[i - 1] && src[i] > src[i + 1])
+			dst.push_back(i);
+	}
+	return dst;
+}
+
+void PlotVector(const vector<float> &src, string &str){
+	ofstream fout(str, ios_base::out);
+	for (int i = 0; i < src.size(); ++i){
+		fout << i << " " << src[i] << "\n";
+	}
+	fout.close();
+}
+
+void PlotVector(const vector<float> &src, float scale, string &str){
+	ofstream fout(str, ios_base::out);
+	for (int i = 0; i < src.size(); ++i){
+		fout << static_cast<float>(i) * scale << " " << src[i] << "\n";
+	}
+	fout.close();
 }
 
 /* Eigen */

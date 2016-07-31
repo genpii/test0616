@@ -22,7 +22,10 @@ vector<float> pwrspe(const vector<float> &v, const int &order);
 IppStatus CrossCorrNormExample(void);
 
 void SimpleMovingAverage(vector<float> &src, int N);
-
+void HanningMovingAverage(vector<float> &src, int N);
+vector<int> PeakDetection(const vector<float> &src);
+void PlotVector(const vector<float> &src, string &str);
+void PlotVector(const vector<float> &src, float scale, string &str);
 
 /*class of fileopen.cpp*/
 class file {
