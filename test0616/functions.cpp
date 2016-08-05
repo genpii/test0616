@@ -88,7 +88,7 @@ void HanningMovingAverage(vector<float> &src, int N){
 	
 	for (int i = 0; i < half; ++i){ //前方境界
 		tmp = 0.0;
-		for (int j = -i; j <= half + i; ++j)
+		for (int j = -i; j <= half; ++j)
 			tmp += src[i + j] * han[j + half];
 		dst[i] = tmp / static_cast<float>(half + i + 1);
 	}
@@ -117,6 +117,20 @@ vector<int> PeakDetection(const vector<float> &src){
 	return dst;
 }
 
+vector<int> PeakDetection(const vector<float> &src, int N){
+	vector<int> dst;
+	int cut = N;
+	for (int i = 1; i < src.size() - 1; ++i){
+		if (src[i] > src[i - 1] && src[i] > src[i + 1])
+			dst.push_back(i);
+	}
+
+	auto result = remove_if(dst.begin(), dst.end(), [cut](int x){return cut >= x; });
+	dst.erase(result, dst.end());
+
+	return dst;
+}
+
 void PlotVector(const vector<float> &src, string &str){
 	ofstream fout(str, ios_base::out);
 	for (int i = 0; i < src.size(); ++i){
@@ -131,6 +145,86 @@ void PlotVector(const vector<float> &src, float scale, string &str){
 		fout << static_cast<float>(i) * scale << " " << src[i] << "\n";
 	}
 	fout.close();
+}
+
+
+vector<int> MakeDelayProfile(const vector<vector<float>> &re, const vector<vector<float>> &im, int refcent){
+	int ch = re.size();
+	int sample = re[0].size();
+	int ref = 47; //47th element is reference
+	vector<int> dst(ch, 0);
+
+	//相関算出用の設定
+	IppStatus status;
+	const int csrc1Len = 256; //相関窓幅
+	const int csrc2Len = sample; //めんどくさいから信号全部入れちゃう
+	int lowLag = -256; // -lowLag * 2 + 1 が全遅延量
+	const int cdstLen = -2 * lowLag + 1;
+	int Lag;
+	Ipp32fc *csrc1 = ippsMalloc_32fc(csrc1Len);
+	Ipp64f csrc1Norm;
+	Ipp32fc *csrc2 = ippsMalloc_32fc(csrc2Len);
+	Ipp64f csrc2Normtmp;
+	Ipp64f *csrc2Norm = ippsMalloc_64f(cdstLen);
+	Ipp32f *csrcNorm = ippsMalloc_32f(cdstLen);
+	Ipp32fc *csrcNormCplx = ippsMalloc_32fc(cdstLen);
+	Ipp32f *cdstLenzeros = ippsMalloc_32f(cdstLen);
+	ippsZero_32f(cdstLenzeros, cdstLen);
+	Ipp32fc *cdst = ippsMalloc_32fc(cdstLen);
+	Ipp32f *cdstMag = ippsMalloc_32f(cdstLen);
+	Ipp32f *cdstPha = ippsMalloc_32f(cdstLen);
+	Ipp32f cmax;
+	int cmaxidx;
+	IppEnum NormA = (IppEnum)(ippAlgAuto | ippsNormNone);
+	int bufsize = 0;
+	Ipp8u *pbuffer;
+	status = ippsCrossCorrNormGetBufferSize(csrc1Len, csrc2Len, cdstLen, lowLag, ipp32fc, NormA, &bufsize);
+	pbuffer = ippsMalloc_8u(bufsize);
+
+	//リファレンスの設定
+	ippsZero_32fc(csrc1, csrc1Len);
+	int csrc1start = refcent - csrc1Len / 2 + 1;
+	for (int i = 0; i < csrc1Len; ++i){
+		csrc1[i].re = re[ref][csrc1start + i];
+		csrc1[i].im = im[ref][csrc1start + i];
+	}
+	csrc1Norm = 0.0;
+	ippsNorm_L2_32fc64f(csrc1, csrc1Len, &csrc1Norm);
+
+	//相関算出
+	for (int i = 0; i < ch; ++i){
+		ippsZero_32fc(csrc2, csrc2Len);
+		ippsZero_32fc(cdst, cdstLen);
+		ippsZero_32f(cdstMag, cdstLen);
+		ippsZero_32f(cdstPha, cdstLen);
+		ippsZero_64f(csrc2Norm, cdstLen);
+		ippsZero_32f(csrcNorm, cdstLen);
+		ippsZero_32fc(csrcNormCplx, cdstLen);
+
+		for (int j = 0; j < csrc2Len; ++j){
+			csrc2[j].re = re[i][j];
+			csrc2[j].im = im[i][j];
+		}
+		status = ippsCrossCorrNorm_32fc(csrc1, csrc1Len, csrc2, csrc2Len, cdst, cdstLen, csrc1start + lowLag, NormA, pbuffer);
+
+		for (int j = 0; j < cdstLen; ++j){
+			csrc2Normtmp = 0.0;
+			ippsNorm_L2_32fc64f(csrc2 + csrc1start + lowLag + j, csrc1Len, &csrc2Normtmp);
+			csrc2Norm[j] = csrc2Normtmp;
+		}
+		ippsMulC_64f_I(csrc1Norm, csrc2Norm, cdstLen);
+		ippsConvert_64f32f(csrc2Norm, csrcNorm, cdstLen);
+		ippsRealToCplx_32f(csrcNorm, cdstLenzeros, csrcNormCplx, cdstLen);
+		ippsDiv_32fc_I(csrcNormCplx, cdst, cdstLen);
+		ippsMagnitude_32fc(cdst, cdstMag, cdstLen);
+		ippsPhase_32fc(cdst, cdstPha, cdstLen);
+		ippsMaxIndx_32f(cdstMag, cdstLen, &cmax, &cmaxidx);
+
+		dst[i] = cmaxidx + lowLag;
+	}
+
+	return dst;
+
 }
 
 /* Eigen */

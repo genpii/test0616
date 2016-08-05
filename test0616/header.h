@@ -24,8 +24,10 @@ IppStatus CrossCorrNormExample(void);
 void SimpleMovingAverage(vector<float> &src, int N);
 void HanningMovingAverage(vector<float> &src, int N);
 vector<int> PeakDetection(const vector<float> &src);
+vector<int> PeakDetection(const vector<float> &src, int N); //Nà»â∫ÇÃÉsÅ[ÉNÇçÌèú
 void PlotVector(const vector<float> &src, string &str);
 void PlotVector(const vector<float> &src, float scale, string &str);
+vector<int> MakeDelayProfile(const vector<vector<float>> &re, const vector<vector<float>> &im, int refcent);
 
 /*class of fileopen.cpp*/
 class file {
@@ -79,6 +81,7 @@ public:
 	void freeRF0();
 	void rmbias();
 	short eledat(int frame, int line, int ch, int sample);
+	vector<float> getxi();
 
 	//int plotRF0();
 	int plotRF0(string dir);

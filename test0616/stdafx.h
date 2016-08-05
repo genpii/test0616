@@ -32,5 +32,5 @@
 #include <stdexcept>
 #include <locale>
 //#include <mkl.h> //IntelMKL
-#include "Eigen\core"
+#include "Eigen\Dense"
 #include "unsupported\Eigen\NonLinearOptimization"

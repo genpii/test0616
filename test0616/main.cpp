@@ -21,57 +21,24 @@
 #include "matplotlibcpp.h"
 
 using namespace std;
+using namespace Eigen;
 namespace plt = matplotlibcpp;
 
 int _tmain(int argc, _TCHAR* argv[])
 {
 	Py_SetPythonHome("C:/Python27/");
-	//ダイナミックフォーカスを行うかどうか
-	bool dynamic_f = true;
 
-
-
-	//string RFdir = "D:/RFdata/study/20160622/";
-	//string dirname = "D:/RFdata/study/20151026/";
-	//physio phy(dirname + "2");
-	//int nn = 9600;
-	//vector<double> x(nn), y(nn);
-
-	//for (int i = 0; i < nn; ++i)
-	//	x[i] = i - nn / 2;
-	//for (int i = 1; i <= 5; ++i){
-	//	double depp = i * 20000;
-	//	for (int j = 0; j < nn; ++j){
-	//		y[j] = (depp + sqrt(pow(depp, 2) + pow(x[j], 2))) / 1540.0;
-	//	}
-	//	plt::plot(x, y, "-");
-	//}
-	////plt::plot(x, y, "--r");
-	//plt::show();
-
-#ifdef _DEBUG
-	cout << "debugging now!\n";
-#endif
-	//CrossCorrNormExample();
 	/* open data */
 	cout << "Load started.\n";
-
-	//よくエラーおきる(Releaseビルドで)
-	//char *RFdirchar = "D:/RFdata/study/20160617/2.crf";
-	//string *RFdir = new string(RFdirchar);
-
-	//string RFdir = "D:/RFdata/study/20160617/2.crf";
-	//string *RFdir = new string();
-	//const string RFdir = "D:/RFdata/study/20160617/2.crf";
-	//string RFdir("D:/RFdata/study/20160617/2.crf");
-	//RFdir = "52101_1.crf"; //X220
-	//a10 raw(*RFdir);
-	//a10 raw("D:/RFdata/study/20160729/1.crf");
-	a10 raw("./20160729/1.crf");
-
+	//ファイル名絡みでよくエラーおきるので注意(Releaseビルドで)
+	a10 raw("D:/RFdata/study/20160729/1.crf");
+	//a10 raw("./20160729/1.crf");
+	//a10 raw("D:/RFdata/study/20160622/52101_1.crf");
+	raw.loadRF0(0);
 
 	raw.frq_s = 30.0; //30MHzにしておく
 	raw.printheader();
+	//簡単のためmain内の変数にする
 	unsigned short frame = raw.frame;
 	unsigned short line = raw.line;
 	unsigned short sample = raw.sample;
@@ -84,20 +51,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	int physio_offset = 1000 / FR;
 	float pitch;
 
+
+
 	vector<int> b_ele; //故障した素子 <-後でクラスa10の方に組み込む予定
 	string p_name = raw.probe_name;
-	if (p_name == "52101"){ //52101だと端が使える
-		b_ele = {};
-		pitch = 200;
-	}
-	else if (p_name == "52105"){ //52105だと使えない
-		b_ele = { 0, 1, 2, 3, 4, 5, 6, 7, 88, 89, 90, 91, 92, 93, 94, 95 };
-		pitch = 240;
-	}
-	else{
-		b_ele = {};
-		pitch = 200;
-	}
+
 	int N_b_ele = b_ele.size();
 	int finest_ele = 48; //基準素子
 	vector<int> fine_ele(raw.ch, 0);
@@ -107,9 +65,8 @@ int _tmain(int argc, _TCHAR* argv[])
 		auto res = remove(fine_ele.begin(), fine_ele.end(), *it);
 		fine_ele.erase(res, fine_ele.end());
 	}
-
-	//phy.extract(physio_offset);
-	//phy.write();
+	//vector<float> xi(ch, 0); // x-coordinate of each element
+	vector<float> xi = raw.getxi();
 
 	/* load RF data */
 	// RF[frame][line][ch][sample]
@@ -130,74 +87,81 @@ int _tmain(int argc, _TCHAR* argv[])
 	vector<float> yyy(4 * sample);
 	for (int i = 0; i < 4 * sample; ++i){
 		xx[i] = i;
+		//yy[i] = raw.RF0[cline][47][i];
+		//yy[i] = raw.ele0re[47][i];
 		yy[i] = sqrt(pow(raw.ele0re[47][i], 2) + pow(raw.ele0im[47][i], 2));
 		//yy[i] = log(sqrt(pow(raw.ele0re[47][i], 2) + pow(raw.ele0im[47][i], 2)));
 		yyy[i] = static_cast<float>(yy[i]);
+		//yyy[i] = raw.ele0im[47][i];
 	}
-	HanningMovingAverage(yyy, 21);
-	vector<int> peak = PeakDetection(yyy);
+	HanningMovingAverage(yyy, 601);
+	vector<int> peak = PeakDetection(yyy, 2048); //0-1024のピークを除去
+
+	vector<pair<float, int>> peakamp(peak.size()); //peak=(振幅,index)
+	for (int i = 0; i < peak.size(); ++i){
+		peakamp[i] = make_pair(yyy[peak[i]], peak[i]);
+	}
+	sort(peakamp.begin(), peakamp.end(), greater<pair<float, int>>()); //振幅順にソート
+
+	int N_est = 4;
+	vector<tuple<float, float, float>> val_est(N_est);
+	for (int l = 0; l < N_est; ++l){
+		vector<int> depro = MakeDelayProfile(raw.ele0re, raw.ele0im, peakamp[l].second);
+		Matrix3f M;
+		Vector3f v;
+		float tmpmv;
+		for (int i = 0; i < 3; ++i){
+			for (int j = 0; j < 3; ++j){
+				tmpmv = 0.0;
+				for (int k = 0; k < ch; ++k)
+					tmpmv += pow(xi[k], 4 - i - j);
+				M(i, j) = tmpmv;
+			}
+			tmpmv = 0.0;
+			for (int j = 0; j < ch; ++j)
+				tmpmv += pow(xi[j], 2 - i) * pow(static_cast<float>(peakamp[l].second / 2 + depro[j]) / (4 * frq_s), 2);
+			v(i) = tmpmv;
+		}
+		//Vector3f ans = M.inverse() * v;
+		FullPivLU<MatrixXf> LU(M);
+		cout << "LU Rank: " << LU.rank() << endl;
+		Vector3f ans = LU.solve(v);
+		float SS = 1 / sqrt(ans(0));
+		float DEP = sqrt(ans(2) / ans(0));
+		float thetaR = asin(-ans(1) / 2.0 / sqrt(ans(2) * ans(0)));
+		cout << "SS: " << SS << endl;
+		cout << "r: " << DEP << endl;
+		cout << "thetaR: " << thetaR * 180.0 / M_PI << endl;
+
+		val_est[l] = make_tuple(DEP, SS, thetaR);
+	}
+	sort(val_est.begin(), val_est.end());
+
+	MatrixXf X = MatrixXf::Ones(ch, 3);
+	VectorXf V(ch);
+	ofstream fo("profile.dat", ios_base::out);
+	for (int i = 0; i < ch; ++i){
+		X(i, 0) = pow(xi[i], 2);
+		X(i, 1) = xi[i];
+		//V(i) = peakamp[0].second / 2 + depro[i];
+		//V(i) = pow(static_cast<float>(peakamp[2].second / 2 + depro[i]) / (4 * frq_s), 2);
+		fo << X(i, 1) << " " << V(i) << "\n";
+	}
+	fo.close();
+
+	cout << "X:\n" << X << endl << "V:\n" << V << endl;
+
+	JacobiSVD<MatrixXf> svd(X, ComputeThinU | ComputeThinV);
+	cout << "Its singular values are:" << endl << svd.singularValues() << endl;
+	cout << "ans:\n" << svd.solve(V) << endl;
+
 	string str = "yyy.dat";
 	PlotVector(yyy, str);
 	str = "peak.dat";
 	ofstream foutt(str, ios_base::out);
-	for (int i = 0; i < peak.size(); ++i)
-		foutt << peak[i] << " " << yyy[peak[i]] << "\n";
+	for (int i = 0; i < 5; ++i)
+		foutt << peakamp[i].second << " " << peakamp[i].first << "\n";
 	foutt.close();
-	//plt::plot(xx, yyy, "-");
-	//plt::plot(peak, yyy, ".");
-	//plt::grid(true);
-	//plt::show();
-
-	//相関計算に用いる定数変数の設定
-	int tryN = 81; //繰り返し回数
-	vector<float> cc(tryN, 0); //音速セット
-	for (int i = 0; i < tryN; ++i)
-		cc[i] = 1540.0 + (i - (tryN - 1) / 2) * 1.25; //[m/s]
-	vector<float> xi(ch, 0); // x-coordinate of each element
-	for (int i = 0; i < ch; ++i)
-		//xi[i] = 0.24 * (39.5 - i) * 1e+3;
-		xi[i] = 0.2 * (47.5 - i) * 1e+3; //um
-	vector<float> theta(line, 0);
-	for (int i = 0; i < line; ++i) //beam angle
-		theta[i] = max_angle * ((line - 1) / 2 - i) * (M_PI / 180.0);
-	int aarea = 4;
-	vector<vector<int>> apf(line, vector<int>(aarea, 0)); //基準素子におけるラインごとの解析点
-	
-	int dep_interval = 1000;
-	float dep, time_r, point_r_float, time_r2, point_r_float2;
-	int point_r, point_r2;
-	vector<vector<float>> qof(tryN, vector<float>(dep_interval, 0));
-	vector<vector<float>> qof2(tryN, vector<float>(dep_interval, 0));
-	ofstream fout("qof.dat", ios_base::out);
-	ofstream fout2("qof2.dat", ios_base::out);
-	for (int i = 0; i < tryN; ++i){
-		for (int j = 0; j < dep_interval; ++j){
-			qof[i][j] = 0.0;
-			dep = static_cast<float>(j)* sample / frq_s / dep_interval; //us
-			for (int k = 0; k < fine_ele.size(); ++k){
-				time_r = (dep + sqrt(pow(dep, 2) + 4.0 * xi[fine_ele[k]] / cc[i] * (xi[fine_ele[k]] / cc[i] - dep * sin(theta[cline])))) / 2.0;
-				
-				point_r_float = time_r * (4.0 * frq_s);
-
-				point_r = static_cast<int>(point_r_float) + 1;
-
-				if (point_r - point_r_float < 0.5)
-					--point_r;
-				if (!(point_r < 0) && point_r < 4 * sample){
-					qof[i][j] += (sqrt(pow(raw.ele0re[fine_ele[k]][point_r], 2) + pow(raw.ele0im[fine_ele[k]][point_r], 2)));
-				}
-
-			}
-			if (dep >= 10.0){
-				fout << cc[i] << " " << dep << " " << qof[i][j] << "\n";
-			}
-		}
-		fout << "\n";
-		fout2 << "\n";
-	}
-	cout << "finish!!!!!\n";
-	fout.close();
-	fout2.close();
 
 	return 0;
 }

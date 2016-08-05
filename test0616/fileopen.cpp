@@ -272,7 +272,7 @@ int a10::plotRF0(string dir)
 
 	for (int i = 0; i < line; ++i){
 		/*ost << "./" << dir << "/" << i << ".dat";*/
-		ost << "./0729/" << /*dir <<*/ i << ".dat";
+		ost << "./0802/" << /*dir <<*/ i << ".dat";
 		fout.open(ost.str(), ios_base::out);
 		ost.clear();
 		ost.str("");
@@ -605,9 +605,16 @@ int a10::generate_AS(int sline){
 
 		//save
 		for (int l = 0; l < 4 * sample; ++l){
-			ele0re[k][l] = 4 * sample * ipdst2[l].re;
-			ele0im[k][l] = 4 * sample * ipdst2[l].im;
+			//ele0re[k][l] = 4 * sample * ipdst2[l].re;
+			//ele0im[k][l] = 4 * sample * ipdst2[l].im;
+			ele0re[k][l] = ipdst2[l].re;
+			ele0im[k][l] = ipdst2[l].im;
 		}
+		for (int l = 16; l > 0; --l){
+			ele0re[k][4 * sample - l] *= exp((l - 16) / 2);
+			ele0im[k][4 * sample - l] *= exp((l - 16) / 2);
+		}
+
 		ippsZero_32fc(ipdst2, 4 * sample);
 	}
 
@@ -618,6 +625,26 @@ int a10::generate_AS(int sline){
 
 	cout << "finished!\n";
 	return 0;
+}
+
+vector<float> a10::getxi()
+{
+	vector<float> dst(ch, 0);
+	float pitch;
+	if (probe_name[0] != NULL){
+		string pn = probe_name;
+		if (pn == "52101")
+			pitch = 200;
+		else if (pn == "52105")
+			pitch = 240;
+		else
+			return dst;
+
+		for (int i = 0; i < ch; ++i)
+			dst[i] = pitch * ((ch - 1) / 2.0 - static_cast<float>(i));
+	}
+
+	return dst;
 }
 
 
