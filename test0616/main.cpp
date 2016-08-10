@@ -143,17 +143,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	for (int i = 0; i < ch; ++i){
 		X(i, 0) = pow(xi[i], 2);
 		X(i, 1) = xi[i];
-		//V(i) = peakamp[0].second / 2 + depro[i];
-		//V(i) = pow(static_cast<float>(peakamp[2].second / 2 + depro[i]) / (4 * frq_s), 2);
 		fo << X(i, 1) << " " << V(i) << "\n";
 	}
 	fo.close();
 
 	cout << "X:\n" << X << endl << "V:\n" << V << endl;
-
-	JacobiSVD<MatrixXf> svd(X, ComputeThinU | ComputeThinV);
-	cout << "Its singular values are:" << endl << svd.singularValues() << endl;
-	cout << "ans:\n" << svd.solve(V) << endl;
 
 	string str = "yyy.dat";
 	PlotVector(yyy, str);
