@@ -194,6 +194,7 @@ void a10::loadRF()
 
 void a10::loadRF0(int frame)
 {
+	
 	fin.seekg(360, ios_base::beg);
 	fin.seekg((line * ch * (sample + 3))* sizeof(short), ios_base::cur); //ignore first frame
 
@@ -202,27 +203,41 @@ void a10::loadRF0(int frame)
 
 	for (int i = 0; i < frame; ++i)
 		fin.seekg((line * ch * (sample + 3))* sizeof(short), ios_base::cur);
-
+	
 	short tmp;
 	cout << "loading RF(frame: " << frame << ")...\n";
-	for (int i = 0; i < line; ++i){
-		//cout << "Loading line:" << i << "\n";
-		for (int j = 0; j < ch - 16; ++j){ // back of 80 elements
-			fin.seekg(8, ios_base::cur); //attribute 6byte channel number 2byte
-			for (int k = 0; k < sample - 1; ++k){
-				fin.read((char*)&tmp, sizeof(short));
-				RF0[i][j + 16][k] = tmp - 2048;
+
+	if (probe_type == 3){ //sector
+		for (int i = 0; i < line; ++i){
+			//cout << "Loading line:" << i << "\n";
+			for (int j = 0; j < ch - 16; ++j){ // back of 80 elements
+				fin.seekg(8, ios_base::cur); //attribute 6byte channel number 2byte
+				for (int k = 0; k < sample - 1; ++k){
+					fin.read((char*)&tmp, sizeof(short));
+					RF0[i][j + 16][k] = tmp - 2048;
+				}
 			}
-		}
-		for (int j = 0; j < 16; ++j){ // front of 16 elements
-			fin.seekg(8, ios_base::cur);
-			for (int k = 0; k < sample - 1; ++k){
-				fin.read((char*)&tmp, sizeof(short));
-				RF0[i][j][k] = tmp - 2048;
+			for (int j = 0; j < 16; ++j){ // front of 16 elements
+				fin.seekg(8, ios_base::cur);
+				for (int k = 0; k < sample - 1; ++k){
+					fin.read((char*)&tmp, sizeof(short));
+					RF0[i][j][k] = tmp - 2048;
+				}
 			}
 		}
 	}
 
+	else if (probe_type == 1){ //linear
+		for (int i = 0; i < line; ++i){
+			for (int j = 0; j < ch; ++j){
+				fin.seekg(8, ios_base::cur);
+				for (int k = 0; k < sample - 1; ++k){
+					fin.read((char*)&tmp, sizeof(short));
+					RF0[i][j][k] = tmp - 2048;
+				}
+			}
+		}
+	}
 }
 
 void a10::freeRF()
@@ -272,7 +287,7 @@ int a10::plotRF0(string dir)
 
 	for (int i = 0; i < line; ++i){
 		/*ost << "./" << dir << "/" << i << ".dat";*/
-		ost << "./0802/" << /*dir <<*/ i << ".dat";
+		ost << "./0821/" << /*dir <<*/ i << ".dat";
 		fout.open(ost.str(), ios_base::out);
 		ost.clear();
 		ost.str("");

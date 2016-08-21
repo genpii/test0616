@@ -31,12 +31,15 @@ int _tmain(int argc, _TCHAR* argv[])
 	/* open data */
 	cout << "Load started.\n";
 	//ファイル名絡みでよくエラーおきるので注意(Releaseビルドで)
-	a10 raw("D:/RFdata/study/20160729/1.crf");
+	//a10 raw("D:/RFdata/study/20160729/1.crf");
+	a10 raw("D:/RFdata/study/20160819/1.crf");
 	//a10 raw("./20160729/1.crf");
 	//a10 raw("D:/RFdata/study/20160622/52101_1.crf");
 	raw.loadRF0(0);
 
-	raw.frq_s = 30.0; //30MHzにしておく
+	if (raw.probe_type == 3)
+		raw.frq_s = 30.0; //30MHzにしておく
+
 	raw.printheader();
 	//簡単のためmain内の変数にする
 	unsigned short frame = raw.frame;
@@ -52,7 +55,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	float pitch;
 
 
-
+	raw.plotRF0(0);
 	vector<int> b_ele; //故障した素子 <-後でクラスa10の方に組み込む予定
 	string p_name = raw.probe_name;
 
@@ -74,8 +77,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	short tmp = 0;
 
 	//raw.loadRF();
-
-	raw.loadRF0(0);
 	//raw.plotRF0("line");
 	//調べる箇所を限定する際の変数
 	int cline = 60;//71;
@@ -105,47 +106,52 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	int N_est = 4;
 	vector<tuple<float, float, float>> val_est(N_est);
-	for (int l = 0; l < N_est; ++l){
-		vector<int> depro = MakeDelayProfile(raw.ele0re, raw.ele0im, peakamp[l].second);
-		Matrix3f M;
-		Vector3f v;
-		float tmpmv;
-		for (int i = 0; i < 3; ++i){
-			for (int j = 0; j < 3; ++j){
+	int NN = 6;
+	ofstream fo("n.dat", ios_base::out);
+	//ch = 48;
+	for (int rep = 0; rep < ch; ++rep){
+		for (int l = 0; l < N_est; ++l){
+			vector<int> depro = MakeDelayProfile(raw.ele0re, raw.ele0im, peakamp[l].second);
+			Matrix3f M;
+			Vector3f v;
+			float tmpmv;
+			for (int i = 0; i < 3; ++i){
+				for (int j = 0; j < 3; ++j){
+					tmpmv = 0.0;
+					for (int k = 0; k < ch; ++k)
+						if (k != rep)
+						tmpmv += pow(xi[k], 4 - i - j);
+					M(i, j) = tmpmv;
+				}
 				tmpmv = 0.0;
-				for (int k = 0; k < ch; ++k)
-					tmpmv += pow(xi[k], 4 - i - j);
-				M(i, j) = tmpmv;
+				for (int j = 0; j < ch; ++j)
+					if (j != rep)
+					tmpmv += pow(xi[j], 2 - i) * pow(static_cast<float>(peakamp[l].second / 2 + depro[j]) / (4 * frq_s), 2);
+				v(i) = tmpmv;
 			}
-			tmpmv = 0.0;
-			for (int j = 0; j < ch; ++j)
-				tmpmv += pow(xi[j], 2 - i) * pow(static_cast<float>(peakamp[l].second / 2 + depro[j]) / (4 * frq_s), 2);
-			v(i) = tmpmv;
-		}
-		//Vector3f ans = M.inverse() * v;
-		FullPivLU<MatrixXf> LU(M);
-		cout << "LU Rank: " << LU.rank() << endl;
-		Vector3f ans = LU.solve(v);
-		float SS = 1 / sqrt(ans(0));
-		float DEP = sqrt(ans(2) / ans(0));
-		float thetaR = asin(-ans(1) / 2.0 / sqrt(ans(2) * ans(0)));
-		cout << "SS: " << SS << endl;
-		cout << "r: " << DEP << endl;
-		cout << "thetaR: " << thetaR * 180.0 / M_PI << endl;
+			Vector3f ans = M.inverse() * v;
+			//FullPivLU<MatrixXf> LU(M);
+			//cout << "LU Rank: " << LU.rank() << endl;
+			//Vector3f ans = LU.solve(v);
+			float SS = 1 / sqrt(ans(0));
+			float DEP = sqrt(ans(2) / ans(0));
+			float thetaR = asin(-ans(1) / 2.0 / sqrt(ans(2) * ans(0)));
+			cout << "SS: " << SS << endl;
+			cout << "r: " << DEP << endl;
+			cout << "thetaR: " << thetaR * 180.0 / M_PI << endl;
 
-		val_est[l] = make_tuple(DEP, SS, thetaR);
+			val_est[l] = make_tuple(DEP, SS, thetaR);
+		}
+
+		fo << get<1>(val_est[1]) << " " << get<0>(val_est[1]) << "\n";
 	}
+	
+	fo.close();
 	sort(val_est.begin(), val_est.end());
 
 	MatrixXf X = MatrixXf::Ones(ch, 3);
 	VectorXf V(ch);
-	ofstream fo("profile.dat", ios_base::out);
-	for (int i = 0; i < ch; ++i){
-		X(i, 0) = pow(xi[i], 2);
-		X(i, 1) = xi[i];
-		fo << X(i, 1) << " " << V(i) << "\n";
-	}
-	fo.close();
+	
 
 	cout << "X:\n" << X << endl << "V:\n" << V << endl;
 
