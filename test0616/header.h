@@ -21,10 +21,13 @@ vector<float> pwrspe(const vector<float> &v, const int &order);
 /* Intel IPP */
 IppStatus CrossCorrNormExample(void);
 
+
+
 void SimpleMovingAverage(vector<float> &src, int N);
 void HanningMovingAverage(vector<float> &src, int N);
 vector<int> PeakDetection(const vector<float> &src);
 vector<int> PeakDetection(const vector<float> &src, int N); //Nà»â∫ÇÃÉsÅ[ÉNÇçÌèú
+vector<int> PeakDetection(const vector<float> &src, int N1, int N2);
 void PlotVector(const vector<float> &src, string &str);
 void PlotVector(const vector<float> &src, float scale, string &str);
 vector<int> MakeDelayProfile(const vector<vector<float>> &re, const vector<vector<float>> &im, int refcent);
@@ -222,3 +225,8 @@ struct misra1a_functor
 	int inputs() const { return inputs_; }
 	int values() const { return values_; }
 };
+
+
+
+/* Draw B-mode */
+void BLinear(a10 &raw);

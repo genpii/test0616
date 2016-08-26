@@ -227,9 +227,34 @@ void a10::loadRF0(int frame)
 		}
 	}
 
-	else if (probe_type == 1){ //linear
-		for (int i = 0; i < line; ++i){
-			for (int j = 0; j < ch; ++j){
+	else if (probe_type == 1 && line == 181){ //linear
+		int border = 42;
+		int ch_store;
+		
+		for (int i = 0; i < border + 1; ++i){
+			ch_store = ch - border + i;
+			for (int j = 0; j < ch_store; ++j){
+				fin.seekg(8, ios_base::cur);
+				for (int k = 0; k < sample - 1; ++k){
+					fin.read((char*)&tmp, sizeof(short));
+					RF0[i][j + border - i][k] = tmp - 2048;
+				}
+			}
+			fin.seekg(((ch - ch_store) * (sample + 3))* sizeof(short), ios_base::cur);
+		}
+
+		for (int i = border + 1; i < line - border - 1; ++i){
+			ch_store = i - border;
+			
+			for (int j = 0; j < ch_store; ++j){
+				fin.seekg(8, ios_base::cur);
+				for (int k = 0; k < sample - 1; ++k){
+					fin.read((char*)&tmp, sizeof(short));
+					RF0[i][ch - ch_store + j][k] = tmp - 2048;
+				}
+			}
+
+			for (int j = 0; j < ch - ch_store; ++j){
 				fin.seekg(8, ios_base::cur);
 				for (int k = 0; k < sample - 1; ++k){
 					fin.read((char*)&tmp, sizeof(short));
@@ -237,7 +262,25 @@ void a10::loadRF0(int frame)
 				}
 			}
 		}
+
+		for (int i = line - border - 1; i < line; ++i){
+			ch_store = i - (line - border - 1);
+			fin.seekg((ch_store * (sample + 3))* sizeof(short), ios_base::cur);
+			for (int j = 0; j < ch - ch_store; ++j){
+				fin.seekg(8, ios_base::cur);
+				for (int k = 0; k < sample - 1; ++k){
+					fin.read((char*)&tmp, sizeof(short));
+					RF0[i][j][k] = tmp - 2048;
+				}
+			}
+		}
+
+
+
 	}
+
+	else
+		cout << "load failed!\n";
 }
 
 void a10::freeRF()
@@ -287,7 +330,7 @@ int a10::plotRF0(string dir)
 
 	for (int i = 0; i < line; ++i){
 		/*ost << "./" << dir << "/" << i << ".dat";*/
-		ost << "./0821/" << /*dir <<*/ i << ".dat";
+		ost << "./0823/" << /*dir <<*/ i << ".dat";
 		fout.open(ost.str(), ios_base::out);
 		ost.clear();
 		ost.str("");
@@ -575,7 +618,7 @@ int a10::generate_AS(int sline){
 		ele0re = vector<vector<float>>(ch, vector<float>(4 * sample, 0));
 		ele0im = vector<vector<float>>(ch, vector<float>(4 * sample, 0));
 	}
-	cout << "generating AS now...\n";
+	//cout << "generating AS now...\n";
 
 
 	for (int k = 0; k < ch; ++k){
@@ -638,7 +681,7 @@ int a10::generate_AS(int sline){
 	ippsFree(ipsrc2);
 	ippsFree(ipdst2);
 
-	cout << "finished!\n";
+	//cout << "finished!\n";
 	return 0;
 }
 
@@ -648,7 +691,7 @@ vector<float> a10::getxi()
 	float pitch;
 	if (probe_name[0] != NULL){
 		string pn = probe_name;
-		if (pn == "52101")
+		if (pn == "52101" || pn == "5412")
 			pitch = 200;
 		else if (pn == "52105")
 			pitch = 240;

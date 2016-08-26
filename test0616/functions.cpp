@@ -131,6 +131,24 @@ vector<int> PeakDetection(const vector<float> &src, int N){
 	return dst;
 }
 
+vector<int> PeakDetection(const vector<float> &src, int N1, int N2){
+	vector<int> dst;
+	int cut1 = N1;
+	int cut2 = N2;
+	for (int i = 1; i < src.size() - 1; ++i){
+		if (src[i] > src[i - 1] && src[i] > src[i + 1])
+			dst.push_back(i);
+	}
+
+	auto result1 = remove_if(dst.begin(), dst.end(), [cut1](int x){return cut1 >= x; });
+	dst.erase(result1, dst.end());
+
+	auto result2 = remove_if(dst.begin(), dst.end(), [cut2](int x){return cut2 <= x; });
+	dst.erase(result2, dst.end());
+
+	return dst;
+}
+
 void PlotVector(const vector<float> &src, string &str){
 	ofstream fout(str, ios_base::out);
 	for (int i = 0; i < src.size(); ++i){
@@ -151,7 +169,7 @@ void PlotVector(const vector<float> &src, float scale, string &str){
 vector<int> MakeDelayProfile(const vector<vector<float>> &re, const vector<vector<float>> &im, int refcent){
 	int ch = re.size();
 	int sample = re[0].size();
-	int ref = 47; //47th element is reference
+	int ref = 70; //47th element is reference
 	vector<int> dst(ch, 0);
 
 	//‘ŠŠÖZo—p‚Ìİ’è
