@@ -83,6 +83,7 @@ public:
 	void freeRF();
 	void freeRF0();
 	void rmbias();
+	int PWclear();
 	short eledat(int frame, int line, int ch, int sample);
 	vector<float> getxi();
 

@@ -330,7 +330,7 @@ int a10::plotRF0(string dir)
 
 	for (int i = 0; i < line; ++i){
 		/*ost << "./" << dir << "/" << i << ".dat";*/
-		ost << "./0823/" << /*dir <<*/ i << ".dat";
+		ost << "./0912_2/" << /*dir <<*/ i << ".dat";
 		fout.open(ost.str(), ios_base::out);
 		ost.clear();
 		ost.str("");
@@ -341,6 +341,27 @@ int a10::plotRF0(string dir)
 			fout << "\n";
 		}
 		fout.close();
+	}
+
+	return 0;
+}
+
+int a10::PWclear()
+{
+	if (RF0.empty()){
+		cout << "RF0 is empty.\n";
+		return 1;
+	}
+
+	vector<short> ref(30, 0);
+	for (int i = 0; i < 30; ++i){
+		ref[i] = RF0[90][0][1705 + i];
+	}
+
+	for (int i = 0; i < ch; ++i){
+		for (int j = 0; j < 30; ++j){
+			RF0[90][i][1705 + j] -= ref[j];
+		}
 	}
 
 	return 0;

@@ -56,7 +56,9 @@ int _tmain(int argc, _TCHAR* argv[])
 	float pitch;
 
 
-	//raw.plotRF0(0);
+	//raw.clear();
+	//raw.plotRF0("0");
+
 	vector<int> b_ele; //故障した素子 <-後でクラスa10の方に組み込む予定
 	string p_name = raw.probe_name;
 
@@ -87,7 +89,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	vector<double> xx(4 * sample), yy(4 * sample);
 	vector<float> yyy(4 * sample);
-	int ref = 70;
+	int ref = 70; //ref element
 	for (int i = 0; i < 4 * sample; ++i){
 		xx[i] = i;
 		//yy[i] = raw.RF0[cline][47][i];
@@ -119,10 +121,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	peakamp.erase(peakamp.begin() + 2);
 	peakamp.erase(peakamp.begin());*/
 	//peakamp.erase(peakamp.begin() + 5);
-	peakamp.erase(peakamp.begin() + 5);
+	/*peakamp.erase(peakamp.begin() + 5);
 	peakamp.erase(peakamp.begin() + 4);
 	peakamp.erase(peakamp.begin() + 1);
-	peakamp.erase(peakamp.begin());
+	peakamp.erase(peakamp.begin());*/
 
 
 	//
